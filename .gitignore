@@ -1,3 +1,4 @@
+# Generated
 *.iml
 .gradle
 /local.properties
@@ -13,3 +14,34 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Keystore / signing
+*.jks
+*.keystore
+keystore.properties
+
+# Kotlin build outputs
+**/*.class
+**/*.dex
+**/*.apk
+**/*.aab
+
+# App-level build dirs
+app/build/
+
+# Gradle wrapper cache
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# OS junk
+Thumbs.db
+*.swp
+*~
+
+# Test results
+/test-results/
+*.xml.bak
+
+# Profiling / benchmark
+*.hprof
+benchmarks/
