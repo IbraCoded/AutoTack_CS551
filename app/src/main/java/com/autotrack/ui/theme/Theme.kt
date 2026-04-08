@@ -1,6 +1,5 @@
-package com.example.autotack_cs551.ui.theme
+package com.autotrack.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

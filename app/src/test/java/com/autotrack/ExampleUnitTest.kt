@@ -1,4 +1,4 @@
-package com.example.autotack_cs551
+package com.autotrack
 
 import org.junit.Test
 

@@ -1,4 +1,4 @@
-package com.example.autotack_cs551.ui.theme
+package com.autotrack.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
