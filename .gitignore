@@ -45,3 +45,6 @@ Thumbs.db
 # Profiling / benchmark
 *.hprof
 benchmarks/
+
+# Do not ignore schemas
+!schemas/
