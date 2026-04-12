@@ -6,6 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.autotrack.ui.screens.HomeScreen
 
 // Route constants
 sealed class Screen(val route: String) {
@@ -55,7 +56,7 @@ fun AutoTrackNavGraph(navController: NavHostController) {
         startDestination = Screen.Home.route
     ) {
         // Main tabs
-        composable(Screen.Home.route)      { PlaceholderScreen("Home") }
+        composable(Screen.Home.route) { HomeScreen(navController) }
         composable(Screen.Records.route)   { PlaceholderScreen("Records") }
         composable(Screen.Fuel.route)      { PlaceholderScreen("Fuel") }
         composable(Screen.Services.route)  { PlaceholderScreen("Services") }
