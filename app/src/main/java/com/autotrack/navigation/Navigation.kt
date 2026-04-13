@@ -6,6 +6,9 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.autotrack.ui.screens.AddEditFuelScreen
+import com.autotrack.ui.screens.AddEditRecordScreen
+import com.autotrack.ui.screens.AddEditVehicleScreen
 import com.autotrack.ui.screens.AnalyticsScreen
 import com.autotrack.ui.screens.FuelScreen
 import com.autotrack.ui.screens.HomeScreen
@@ -49,10 +52,6 @@ sealed class Screen(val route: String) {
     }
 }
 
-@Composable
-fun PlaceholderScreen(name: String) {
-    androidx.compose.material3.Text(text = "$name screen — coming soon")
-}
 
 // NavGraph
 @Composable
@@ -91,7 +90,11 @@ fun AutoTrackNavGraph(navController: NavHostController) {
                     defaultValue = -1L
                 }
             )
-        ) { PlaceholderScreen("Add/Edit Vehicle") }
+        ) { backStack ->
+            val vehicleId = backStack.arguments?.getLong("vehicleId")
+                ?.takeIf { it != -1L }
+            AddEditVehicleScreen(navController, vehicleId)
+        }
 
         // Add/Edit service record
         composable(
@@ -103,7 +106,11 @@ fun AutoTrackNavGraph(navController: NavHostController) {
                     defaultValue = -1L
                 }
             )
-        ) { PlaceholderScreen("Add/Edit Record") }
+        ) { backStack ->
+            val vehicleId = backStack.arguments?.getLong("vehicleId") ?: return@composable
+            val recordId  = backStack.arguments?.getLong("recordId")?.takeIf { it != -1L }
+            AddEditRecordScreen(navController, vehicleId, recordId)
+        }
 
         // Add/Edit fuel entry
         composable(
@@ -115,6 +122,10 @@ fun AutoTrackNavGraph(navController: NavHostController) {
                     defaultValue = -1L
                 }
             )
-        ) { PlaceholderScreen("Add/Edit Fuel") }
+        ) { backStack ->
+            val vehicleId = backStack.arguments?.getLong("vehicleId") ?: return@composable
+            val entryId   = backStack.arguments?.getLong("entryId")?.takeIf { it != -1L }
+            AddEditFuelScreen(navController, vehicleId, entryId)
+        }
     }
 }
