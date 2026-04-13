@@ -6,7 +6,13 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.autotrack.ui.screens.AnalyticsScreen
+import com.autotrack.ui.screens.FuelScreen
 import com.autotrack.ui.screens.HomeScreen
+import com.autotrack.ui.screens.PreferencesScreen
+import com.autotrack.ui.screens.RecordsScreen
+import com.autotrack.ui.screens.ServicesScreen
+import com.autotrack.ui.screens.VehicleDetailScreen
 
 // Route constants
 sealed class Screen(val route: String) {
@@ -57,13 +63,13 @@ fun AutoTrackNavGraph(navController: NavHostController) {
     ) {
         // Main tabs
         composable(Screen.Home.route) { HomeScreen(navController) }
-        composable(Screen.Records.route)   { PlaceholderScreen("Records") }
-        composable(Screen.Fuel.route)      { PlaceholderScreen("Fuel") }
-        composable(Screen.Services.route)  { PlaceholderScreen("Services") }
-        composable(Screen.Analytics.route) { PlaceholderScreen("Analytics") }
+        composable(Screen.Records.route) { RecordsScreen(navController) }
+        composable(Screen.Fuel.route)      { FuelScreen(navController) }
+        composable(Screen.Services.route)  { ServicesScreen(navController) }
+        composable(Screen.Analytics.route) { AnalyticsScreen(navController) }
 
         // Preferences
-        composable(Screen.Preferences.route) { PlaceholderScreen("Preferences") }
+        composable(Screen.Preferences.route) { PreferencesScreen(navController) }
 
         // Vehicle details
         composable(
@@ -71,7 +77,10 @@ fun AutoTrackNavGraph(navController: NavHostController) {
             arguments = listOf(
                 navArgument("vehicleId") { type = NavType.LongType }
             )
-        ) { PlaceholderScreen("Vehicle Detail") }
+        ) { backStack ->
+            val vehicleId = backStack.arguments?.getLong("vehicleId") ?: return@composable
+            VehicleDetailScreen(navController, vehicleId)
+        }
 
         // Add/Edit vehicle
         composable(
