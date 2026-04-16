@@ -2,11 +2,25 @@ package com.autotrack.data.local.repository
 
 import retrofit2.http.GET
 import retrofit2.http.Path
+import com.google.gson.annotations.SerializedName
 
-data class NhtsaMakesResponse(val Results: List<NhtsaMake>)
-data class NhtsaModelsResponse(val Results: List<NhtsaModel>)
-data class NhtsaMake(val MakeId: Int, val MakeName: String?)
-data class NhtsaModel(val ModelId: Int, val ModelName: String?)
+data class NhtsaMakesResponse(
+    @SerializedName("Results") val Results: List<NhtsaMake>
+)
+
+data class NhtsaModelsResponse(
+    @SerializedName("Results") val Results: List<NhtsaModel>
+)
+
+data class NhtsaMake(
+    @SerializedName("Make_ID") val MakeId: Int,
+    @SerializedName("Make_Name") val MakeName: String?
+)
+
+data class NhtsaModel(
+    @SerializedName("Model_ID") val ModelId: Int,
+    @SerializedName("Model_Name") val ModelName: String?
+)
 
 interface NhtsaApiService {
     @GET("vehicles/GetAllMakes?format=json")

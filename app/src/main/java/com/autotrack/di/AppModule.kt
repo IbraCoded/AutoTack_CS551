@@ -31,6 +31,8 @@ object AppModule {
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AutoTrackDatabase =
         Room.databaseBuilder(ctx, AutoTrackDatabase::class.java, "autotrack_db")
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
 
     @Provides @Singleton

@@ -87,6 +87,8 @@ fun AddEditVehicleScreen(
     val makes by vm.makes.collectAsStateWithLifecycle()
     val models by vm.models.collectAsStateWithLifecycle()
     val isLoadingMakes by vm.isLoadingMakes.collectAsStateWithLifecycle()
+    val isLoadingModels by vm.isLoadingModels.collectAsStateWithLifecycle()
+    val apiError by vm.apiError.collectAsStateWithLifecycle()
     val vehicles by vm.vehicles.collectAsStateWithLifecycle()
     val existing = vehicles.find { it.id == vehicleId }
 
@@ -161,13 +163,14 @@ fun AddEditVehicleScreen(
                             makeExpanded = true
                         },
                         label = { Text("Make *") },
-                        isError = makeError.isNotEmpty(),
+                        isError = makeError.isNotEmpty() || apiError != null,
                         supportingText = {
                             if (makeError.isNotEmpty()) Text(makeError)
+                            else if (apiError != null) Text(apiError!!, color = MaterialTheme.colorScheme.error)
                         },
                         trailingIcon = {
                             if (isLoadingMakes)
-                                CircularProgressIndicator(Modifier.size(20.dp))
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                             else
                                 ExposedDropdownMenuDefaults.TrailingIcon(makeExpanded)
                         },
@@ -186,7 +189,7 @@ fun AddEditVehicleScreen(
                         else it.MakeName?.contains(q, ignoreCase = true) == true
                     }.take(30)
 
-                    if (filtered.isNotEmpty()) {
+                    if (filtered.isNotEmpty() && makeExpanded) {
                         ExposedDropdownMenu(
                             expanded = makeExpanded,
                             onDismissRequest = { makeExpanded = false }
@@ -213,7 +216,7 @@ fun AddEditVehicleScreen(
                 ExposedDropdownMenuBox(
                     expanded = modelExpanded,
                     onExpandedChange = {
-                        if (models.isNotEmpty()) modelExpanded = it
+                        if (models.isNotEmpty() || isLoadingModels) modelExpanded = it
                     }
                 ) {
                     OutlinedTextField(
@@ -225,7 +228,10 @@ fun AddEditVehicleScreen(
                             if (modelError.isNotEmpty()) Text(modelError)
                         },
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded)
+                            if (isLoadingModels)
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else
+                                ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded)
                         },
                         modifier = Modifier
                             .menuAnchor()
@@ -240,7 +246,7 @@ fun AddEditVehicleScreen(
                         it.ModelName?.contains(model, ignoreCase = true) == true
                     }.take(30)
 
-                    if (filteredModels.isNotEmpty()) {
+                    if (filteredModels.isNotEmpty() && modelExpanded) {
                         ExposedDropdownMenu(
                             expanded = modelExpanded,
                             onDismissRequest = { modelExpanded = false }
@@ -251,6 +257,7 @@ fun AddEditVehicleScreen(
                                     onClick = {
                                         model = m.ModelName ?: ""
                                         modelExpanded = false
+                                        focusManager.moveFocus(FocusDirection.Down)
                                     }
                                 )
                             }
