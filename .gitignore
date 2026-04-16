@@ -1,0 +1,50 @@
+# Generated
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Keystore / signing
+*.jks
+*.keystore
+keystore.properties
+
+# Kotlin build outputs
+**/*.class
+**/*.dex
+**/*.apk
+**/*.aab
+
+# App-level build dirs
+app/build/
+
+# Gradle wrapper cache
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# OS junk
+Thumbs.db
+*.swp
+*~
+
+# Test results
+/test-results/
+*.xml.bak
+
+# Profiling / benchmark
+*.hprof
+benchmarks/
+
+# Do not ignore schemas
+!schemas/
