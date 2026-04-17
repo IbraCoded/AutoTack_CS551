@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.AutoTack_CS551" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.AutoTrack" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@color/obsidian</item>
+        <item name="android:navigationBarColor">@color/gunmetal_deep</item>
+    </style>
 </resources>
