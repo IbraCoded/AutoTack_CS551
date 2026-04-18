@@ -57,9 +57,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// TODO: Fix local date issue
-private val dateFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
-
+private val dateFormat = SimpleDateFormat("d MMM yyyy", Locale.UK)
 private val currencyFormat = NumberFormat.getCurrencyInstance(Locale.UK)
 
 // RECORDS SCREEN
@@ -75,7 +73,7 @@ fun RecordsScreen(
     Scaffold(
         topBar = {
             AutoTrackTopBar(
-                title = "Records",
+                title = "RECORDS",
                 showSettings = false
             )
         },
@@ -123,7 +121,6 @@ fun RecordsScreen(
                             )
                         }
                         Row {
-                            // Share service report
                             IconButton(onClick = {
                                 shareServiceReport(
                                     context, vehicle.make,
@@ -136,7 +133,6 @@ fun RecordsScreen(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
-                            // Add record for this vehicle
                             IconButton(onClick = {
                                 navController.navigate(
                                     Screen.AddEditRecord.createRoute(vehicle.id)
@@ -292,8 +288,6 @@ fun VehicleDetailScreen(
     val vehicle = vehicles.find { it.id == vehicleId }
     val records by vm.recordsForVehicle(vehicleId)
         .collectAsStateWithLifecycle(emptyList())
-    val fuelCount by vm.fuelCount(vehicleId)
-        .collectAsStateWithLifecycle(0)
     val avgMpg by vm.avgMpg(vehicleId)
         .collectAsStateWithLifecycle(null)
     val totalSpend by vm.totalSpend(vehicleId)

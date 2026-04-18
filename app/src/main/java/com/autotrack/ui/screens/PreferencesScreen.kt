@@ -1,49 +1,24 @@
 package com.autotrack.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.autotrack.ui.components.AutoTrackTopBar
+import com.autotrack.ui.theme.*
 import com.autotrack.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,197 +27,132 @@ fun PreferencesScreen(
     navController: NavController,
     vm: MainViewModel = hiltViewModel()
 ) {
-    val prefs by vm.preferences.collectAsStateWithLifecycle()
-
+    val prefs            by vm.preferences.collectAsStateWithLifecycle()
     var intervalExpanded by remember { mutableStateOf(false) }
     var distanceExpanded by remember { mutableStateOf(false) }
     var currencyExpanded by remember { mutableStateOf(false) }
-    var thresholdText by remember(prefs) {
-        mutableStateOf(prefs.overdueThresholdDays.toString())
-    }
+    var thresholdText    by remember(prefs) { mutableStateOf(prefs.overdueThresholdDays.toString()) }
 
-    val intervals = listOf("Daily", "Weekly", "Fortnightly", "Monthly")
-    val distUnits = listOf("mi", "km")
+    val intervals  = listOf("Daily", "Weekly", "Fortnightly", "Monthly")
+    val distUnits  = listOf("mi", "km")
     val currencies = listOf("GBP £", "USD $", "EUR €")
 
     Scaffold(
         topBar = {
-            AutoTrackTopBar(
-                title = "Preferences",
-                showBack = true,
-                onBack = { navController.popBackStack() }
-            )
-        }
+            AutoTrackTopBar(title = "PREFERENCES", showBack = true, onBack = { navController.popBackStack() })
+        },
+        containerColor = Obsidian
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            modifier            = Modifier.fillMaxSize().background(Obsidian).padding(padding),
+            contentPadding      = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            item { SectionLabel("APPEARANCE") }
 
-            // APPEARANCE
             item {
-                Text(
-                    "APPEARANCE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-            item {
-                Card {
-                    Column(Modifier.padding(4.dp)) {
-
-                        PrefSwitchRow(
-                            label = "Dark Theme",
-                            icon = Icons.Filled.DarkMode,
-                            checked = prefs.darkTheme,
-                            onCheckedChange = { vm.setDarkTheme(it) }
+                PremiumPrefCard {
+                    PrefSwitchRow("Dark Theme", Icons.Filled.DarkMode, prefs.darkTheme) { vm.setDarkTheme(it) }
+                    PrefDivider()
+                    ExposedDropdownMenuBox(
+                        expanded = distanceExpanded,
+                        onExpandedChange = { distanceExpanded = it }
+                    ) {
+                        PrefDropdownRow(
+                            "Distance Unit", Icons.Filled.Speed,
+                            prefs.distanceUnit, distanceExpanded,
+                            Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         )
-
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-
-                        // Distance unit
-                        ExposedDropdownMenuBox(
+                        ExposedDropdownMenu(
                             expanded = distanceExpanded,
-                            onExpandedChange = { distanceExpanded = it }
+                            onDismissRequest = { distanceExpanded = false },
+                            modifier = Modifier.background(GunmetalMid)
                         ) {
-                            PrefDropdownRow(
-                                label = "Distance Unit",
-                                icon = Icons.Filled.Speed,
-                                value = prefs.distanceUnit,
-                                expanded = distanceExpanded,
-                                modifier = Modifier.menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = distanceExpanded,
-                                onDismissRequest = { distanceExpanded = false }
-                            ) {
-                                distUnits.forEach { u ->
-                                    DropdownMenuItem(
-                                        text = { Text(u) },
-                                        onClick = {
-                                            vm.setDistanceUnit(u)
-                                            distanceExpanded = false
-                                        }
-                                    )
-                                }
+                            distUnits.forEach { u ->
+                                DropdownMenuItem(
+                                    text = { Text(u, color = ChromeWhite) },
+                                    onClick = { vm.setDistanceUnit(u); distanceExpanded = false }
+                                )
                             }
                         }
-
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-
-                        // Currency
-                        ExposedDropdownMenuBox(
+                    }
+                    PrefDivider()
+                    ExposedDropdownMenuBox(
+                        expanded = currencyExpanded,
+                        onExpandedChange = { currencyExpanded = it }
+                    ) {
+                        PrefDropdownRow(
+                            "Currency", Icons.Filled.AttachMoney,
+                            prefs.currency, currencyExpanded,
+                            Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        )
+                        ExposedDropdownMenu(
                             expanded = currencyExpanded,
-                            onExpandedChange = { currencyExpanded = it }
+                            onDismissRequest = { currencyExpanded = false },
+                            modifier = Modifier.background(GunmetalMid)
                         ) {
-                            PrefDropdownRow(
-                                label = "Currency",
-                                icon = Icons.Filled.AttachMoney,
-                                value = prefs.currency,
-                                expanded = currencyExpanded,
-                                modifier = Modifier.menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = currencyExpanded,
-                                onDismissRequest = { currencyExpanded = false }
-                            ) {
-                                currencies.forEach { c ->
-                                    DropdownMenuItem(
-                                        text = { Text(c) },
-                                        onClick = {
-                                            vm.setCurrency(c)
-                                            currencyExpanded = false
-                                        }
-                                    )
-                                }
+                            currencies.forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text(c, color = ChromeWhite) },
+                                    onClick = { vm.setCurrency(c); currencyExpanded = false }
+                                )
                             }
                         }
                     }
                 }
             }
 
-            //NOTIFICATIONS
-            item { Spacer(Modifier.height(8.dp)) }
-            item {
-                Text(
-                    "NOTIFICATIONS",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-            item {
-                Card {
-                    Column(Modifier.padding(4.dp)) {
+            item { Spacer(Modifier.height(4.dp)) }
+            item { SectionLabel("NOTIFICATIONS") }
 
-                        PrefSwitchRow(
-                            label = "Service Reminders",
-                            icon = Icons.Filled.Notifications,
-                            checked = prefs.remindersEnabled,
-                            onCheckedChange = { vm.setRemindersEnabled(it) }
-                        )
-
-                        if (prefs.remindersEnabled) {
-                            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                            ExposedDropdownMenuBox(
+            item {
+                PremiumPrefCard {
+                    PrefSwitchRow("Service Reminders", Icons.Filled.Notifications, prefs.remindersEnabled) { vm.setRemindersEnabled(it) }
+                    if (prefs.remindersEnabled) {
+                        PrefDivider()
+                        ExposedDropdownMenuBox(
+                            expanded = intervalExpanded,
+                            onExpandedChange = { intervalExpanded = it }
+                        ) {
+                            PrefDropdownRow(
+                                "Reminder Interval", Icons.Filled.Schedule,
+                                prefs.reminderInterval, intervalExpanded,
+                                Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            )
+                            ExposedDropdownMenu(
                                 expanded = intervalExpanded,
-                                onExpandedChange = { intervalExpanded = it }
+                                onDismissRequest = { intervalExpanded = false },
+                                modifier = Modifier.background(GunmetalMid)
                             ) {
-                                PrefDropdownRow(
-                                    label = "Reminder Interval",
-                                    icon = Icons.Filled.Schedule,
-                                    value = prefs.reminderInterval,
-                                    expanded = intervalExpanded,
-                                    modifier = Modifier.menuAnchor()
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = intervalExpanded,
-                                    onDismissRequest = { intervalExpanded = false }
-                                ) {
-                                    intervals.forEach { i ->
-                                        DropdownMenuItem(
-                                            text = { Text(i) },
-                                            onClick = {
-                                                vm.setReminderInterval(i)
-                                                intervalExpanded = false
-                                            }
-                                        )
-                                    }
+                                intervals.forEach { i ->
+                                    DropdownMenuItem(
+                                        text = { Text(i, color = ChromeWhite) },
+                                        onClick = { vm.setReminderInterval(i); intervalExpanded = false }
+                                    )
                                 }
                             }
                         }
-
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-
-                        PrefSwitchRow(
-                            label = "Mileage Alerts",
-                            icon = Icons.Filled.Speed,
-                            checked = prefs.mileageAlertsEnabled,
-                            onCheckedChange = { vm.setMileageAlerts(it) }
-                        )
-
-                        if (prefs.mileageAlertsEnabled) {
-                            HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Overdue threshold (days)")
-                                OutlinedTextField(
-                                    value = thresholdText,
-                                    onValueChange = {
-                                        thresholdText = it
-                                        it.toIntOrNull()?.let { d ->
-                                            vm.setOverdueThreshold(d)
-                                        }
-                                    },
-                                    modifier = Modifier.width(80.dp),
-                                    singleLine = true
-                                )
-                            }
+                    }
+                    PrefDivider()
+                    PrefSwitchRow("Mileage Alerts", Icons.Filled.Speed, prefs.mileageAlertsEnabled) { vm.setMileageAlerts(it) }
+                    if (prefs.mileageAlertsEnabled) {
+                        PrefDivider()
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Overdue threshold (days)", color = SilverMid, fontSize = 13.sp)
+                            OutlinedTextField(
+                                value         = thresholdText,
+                                onValueChange = { v ->
+                                    thresholdText = v
+                                    v.toIntOrNull()?.let { d -> vm.setOverdueThreshold(d) }
+                                },
+                                modifier   = Modifier.width(80.dp),
+                                singleLine = true,
+                                colors     = premiumTextFieldColors()
+                            )
                         }
                     }
                 }
@@ -251,34 +161,48 @@ fun PreferencesScreen(
     }
 }
 
-// Preference row components
+@Composable
+fun PremiumPrefCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(GunmetalDeep, RoundedCornerShape(14.dp))
+            .border(1.dp, GunmetalLight, RoundedCornerShape(14.dp)),
+        content  = content
+    )
+}
+
+@Composable
+fun PrefDivider() {
+    HorizontalDivider(color = GunmetalLight, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
+}
+
 @Composable
 fun PrefSwitchRow(
     label: String,
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(icon, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(12.dp))
-            Text(label)
+            Text(label, color = ChromeWhite, fontSize = 14.sp)
         }
         Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange
+            checked         = checked,
+            onCheckedChange = onCheckedChange,
+            colors          = SwitchDefaults.colors(
+                checkedThumbColor   = Obsidian,
+                checkedTrackColor   = GoldPrimary,
+                uncheckedThumbColor = SilverDim,
+                uncheckedTrackColor = GunmetalLight
+            )
         )
     }
 }
@@ -286,35 +210,24 @@ fun PrefSwitchRow(
 @Composable
 fun PrefDropdownRow(
     label: String,
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     value: String,
     expanded: Boolean,
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(icon, null, tint = GoldPrimary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(12.dp))
-            Text(label)
+            Text(label, color = ChromeWhite, fontSize = 14.sp)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value, color = MaterialTheme.colorScheme.primary)
-            Icon(
-                if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline
-            )
+            Text(value, color = GoldPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = SilverDim)
         }
     }
 }
