@@ -63,14 +63,52 @@ class MainViewModel @Inject constructor(
     private val _isLoadingMakes = MutableStateFlow(false)
     val isLoadingMakes: StateFlow<Boolean> = _isLoadingMakes
 
+    private val _isLoadingModels = MutableStateFlow(false)
+    val isLoadingModels: StateFlow<Boolean> = _isLoadingModels
+
+    private val _apiError = MutableStateFlow<String?>(null)
+    val apiError: StateFlow<String?> = _apiError
+
     fun loadMakes() = viewModelScope.launch {
         _isLoadingMakes.value = true
-        _makes.value = repo.fetchAllMakes().sortedBy { it.MakeName }
-        _isLoadingMakes.value = false
+        _apiError.value = null
+        try {
+            val result = repo.fetchAllMakes()
+            if (result.isEmpty()) {
+                _apiError.value = "Failed to load makes. Check connection."
+            }
+            _makes.value = result.filter { it.MakeName != null }.sortedBy { it.MakeName }
+        } catch (e: Exception) {
+            _apiError.value = "Error: ${e.message}"
+        } finally {
+            _isLoadingMakes.value = false
+        }
     }
 
-    fun loadModels(make: String) = viewModelScope.launch {
-        _models.value = repo.fetchModelsForMake(make).sortedBy { it.ModelName }
+    private var loadModelsJob: kotlinx.coroutines.Job? = null
+    fun loadModels(make: String) {
+        loadModelsJob?.cancel()
+        if (make.isBlank()) {
+            _models.value = emptyList()
+            return
+        }
+
+        // Only trigger API if the make exists in our list (minimizes wasteful calls)
+        val matches = _makes.value.any { it.MakeName?.equals(make, ignoreCase = true) == true }
+        if (!matches) return
+
+        loadModelsJob = viewModelScope.launch {
+            _isLoadingModels.value = true
+            _apiError.value = null
+            try {
+                val result = repo.fetchModelsForMake(make)
+                _models.value = result.filter { it.ModelName != null }.sortedBy { it.ModelName }
+            } catch (e: Exception) {
+                _apiError.value = "Error: ${e.message}"
+            } finally {
+                _isLoadingModels.value = false
+            }
+        }
     }
 
     //  Vehicle CRUD
