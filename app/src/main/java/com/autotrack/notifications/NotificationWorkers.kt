@@ -53,7 +53,7 @@ class ServiceReminderWorker @AssistedInject constructor(
                 applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE
             )
             val notif = NotificationCompat.Builder(applicationContext, CHANNEL_SERVICE)
-                .setSmallIcon(R.drawable.ic_notification)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle("AutoTrack — Services Due")
                 .setStyle(NotificationCompat.BigTextStyle().bigText(alerts.joinToString("\n")))
                 .setContentIntent(pi)
@@ -71,8 +71,7 @@ class ServiceReminderWorker @AssistedInject constructor(
 @HiltWorker
 class MileageAlertWorker @AssistedInject constructor(
     @Assisted context: Context,
-    @Assisted params: WorkerParameters,
-    private val repo: AutoTrackRepository
+    @Assisted params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -89,7 +88,7 @@ class MileageAlertWorker @AssistedInject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notif = NotificationCompat.Builder(applicationContext, CHANNEL_MILEAGE)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("$vehicleName — Service Due")
             .setContentText("$serviceType is due based on your current mileage.")
             .addAction(0, "Log Now", logPi)
