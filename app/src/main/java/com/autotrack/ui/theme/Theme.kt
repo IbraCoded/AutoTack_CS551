@@ -3,8 +3,7 @@ package com.autotrack.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -13,65 +12,96 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-// ── Premium Palette ─────────────────────────────────────────────
-val Obsidian        = Color(0xFF0D0F14)
-val GunmetalDeep    = Color(0xFF131720)
-val GunmetalMid     = Color(0xFF1C2233)
-val GunmetalLight   = Color(0xFF252D42)
+// ── CompositionLocal: every composable reads the USER pref not system theme
+val LocalIsDarkTheme = compositionLocalOf { false }
 
-val GoldPrimary     = Color(0xFFC9A84C)
-val GoldLight       = Color(0xFFE8C97A)
-val GoldDim         = Color(0xFF8A6E2F)
+// ── Dark Mode Palette ─────────────────────────────────────────────────
+val DarkBg          = Color(0xFF0F1117)
+val DarkSurface     = Color(0xFF181C27)
+val DarkCard        = Color(0xFF1E2335)
+val DarkCardBorder  = Color(0xFF2A3050)
 
-val ChromeWhite     = Color(0xFFF0F2F7)
-val SilverMid       = Color(0xFFADB5C8)
-val SilverDim       = Color(0xFF5A6380)
+// ── Light Mode Palette ────────────────────────────────────────────────
+val LightBg         = Color(0xFFF8FAFC)
+val LightSurface    = Color(0xFFFFFFFF)
+val LightCard       = Color(0xFFFFFFFF)
+val LightCardBorder = Color(0xFFE2E8F0)
 
-val EmeraldSuccess  = Color(0xFF2ECC8E)
-val AmberWarn       = Color(0xFFE8A020)
-val CrimsonAlert    = Color(0xFFE03C52)
+// ── Accent Colours ────────────────────────────────────────────────────
+val AmberDark    = Color(0xFFF59E0B)
+val AmberDarkDim = Color(0xFF92400E)
+val AmberLight   = Color(0xFFD97706)
+val AmberLightDim= Color(0xFFFEF3C7)
+val GreenAccent  = Color(0xFF059669)
+val GreenDark    = Color(0xFF10B981)
+val RedAccent    = Color(0xFFDC2626)
+val RedDark      = Color(0xFFEF4444)
 
-// Keep old names for backward compat in other files
-val GreenSuccess    = EmeraldSuccess
-val RedAlert        = CrimsonAlert
+// ── Text ──────────────────────────────────────────────────────────────
+val DarkTextPrimary   = Color(0xFFF1F5F9)
+val DarkTextSecondary = Color(0xFF94A3B8)
+val DarkTextMuted     = Color(0xFF475569)
+val LightTextPrimary   = Color(0xFF0F172A)
+val LightTextSecondary = Color(0xFF475569)
+val LightTextMuted     = Color(0xFF94A3B8)
 
-private val DarkPremiumColors = darkColorScheme(
-    primary              = GoldPrimary,
-    onPrimary            = Obsidian,
-    primaryContainer     = GunmetalMid,
-    onPrimaryContainer   = GoldLight,
-    secondary            = SilverMid,
-    onSecondary          = Obsidian,
-    secondaryContainer   = GunmetalLight,
-    onSecondaryContainer = ChromeWhite,
-    background           = Obsidian,
-    surface              = GunmetalDeep,
-    surfaceVariant       = GunmetalMid,
-    onBackground         = ChromeWhite,
-    onSurface            = ChromeWhite,
-    onSurfaceVariant     = SilverMid,
-    error                = CrimsonAlert,
-    onError              = ChromeWhite,
-    outline              = GunmetalLight,
-    outlineVariant       = SilverDim
+// ── Backward-compat aliases ───────────────────────────────────────────
+val Obsidian       = DarkBg
+val GunmetalDeep   = DarkSurface
+val GunmetalMid    = DarkCard
+val GunmetalLight  = DarkCardBorder
+val GoldPrimary    = AmberDark
+val GoldLight      = Color(0xFFFCD34D)
+val GoldDim        = AmberDarkDim
+val ChromeWhite    = DarkTextPrimary
+val SilverMid      = DarkTextSecondary
+val SilverDim      = DarkTextMuted
+val EmeraldSuccess = GreenDark
+val AmberWarn      = AmberDark
+val CrimsonAlert   = RedDark
+val GreenSuccess   = GreenDark
+val RedAlert       = RedDark
+
+private val DarkColors = darkColorScheme(
+    primary              = AmberDark,
+    onPrimary            = DarkBg,
+    primaryContainer     = Color(0xFF292108),
+    onPrimaryContainer   = Color(0xFFFCD34D),
+    secondary            = DarkTextSecondary,
+    onSecondary          = DarkBg,
+    secondaryContainer   = DarkCard,
+    onSecondaryContainer = DarkTextPrimary,
+    background           = DarkBg,
+    surface              = DarkSurface,
+    surfaceVariant       = DarkCard,
+    onBackground         = DarkTextPrimary,
+    onSurface            = DarkTextPrimary,
+    onSurfaceVariant     = DarkTextSecondary,
+    error                = RedDark,
+    onError              = Color.White,
+    outline              = DarkCardBorder,
+    outlineVariant       = DarkTextMuted
 )
 
-private val LightPremiumColors = lightColorScheme(
-    primary              = Color(0xFF8A6820),
+private val LightColors = lightColorScheme(
+    primary              = AmberLight,
     onPrimary            = Color.White,
-    primaryContainer     = Color(0xFFF5E9C8),
-    onPrimaryContainer   = Color(0xFF3D2D00),
-    secondary            = Color(0xFF6B5E45),
+    primaryContainer     = AmberLightDim,
+    onPrimaryContainer   = Color(0xFF78350F),
+    secondary            = LightTextSecondary,
     onSecondary          = Color.White,
-    background           = Color(0xFFF7F5F0),
-    surface              = Color(0xFFFFFFFF),
-    surfaceVariant       = Color(0xFFF0EBE0),
-    onBackground         = Color(0xFF1A1710),
-    onSurface            = Color(0xFF1A1710),
-    onSurfaceVariant     = Color(0xFF5A5040),
-    error                = CrimsonAlert,
-    outline              = Color(0xFFD4C8AA),
-    outlineVariant       = Color(0xFFBEB0A0)
+    secondaryContainer   = Color(0xFFF1F5F9),
+    onSecondaryContainer = LightTextPrimary,
+    background           = LightBg,
+    surface              = LightSurface,
+    surfaceVariant       = Color(0xFFF1F5F9),
+    onBackground         = LightTextPrimary,
+    onSurface            = LightTextPrimary,
+    onSurfaceVariant     = LightTextSecondary,
+    error                = RedAccent,
+    onError              = Color.White,
+    outline              = LightCardBorder,
+    outlineVariant       = Color(0xFFCBD5E1)
 )
 
 val AutoTrackTypography = Typography(
@@ -91,20 +121,22 @@ fun AutoTrackTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkPremiumColors else LightPremiumColors
+    val colorScheme = if (darkTheme) DarkColors else LightColors
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = if (darkTheme) Obsidian.toArgb()
-            else Color(0xFFF7F5F0).toArgb()
+            window.statusBarColor = if (darkTheme) DarkBg.toArgb() else LightBg.toArgb()
             WindowCompat.getInsetsController(window, view)
                 .isAppearanceLightStatusBars = !darkTheme
         }
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography  = AutoTrackTypography,
-        content     = content
-    )
+    // Provide LocalIsDarkTheme so all screens read the USER preference
+    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography  = AutoTrackTypography,
+            content     = content
+        )
+    }
 }
