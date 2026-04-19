@@ -30,6 +30,7 @@ import com.autotrack.data.local.entity.Vehicle
 import com.autotrack.ui.components.AutoTrackTopBar
 import com.autotrack.ui.theme.*
 import com.autotrack.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -106,6 +107,12 @@ fun AddEditVehicleScreen(
     var yearError    by remember { mutableStateOf("") }
     var mileageError by remember { mutableStateOf("") }
 
+    val isFormValid = make.isNotBlank() && model.isNotBlank() &&
+            year.toIntOrNull() != null && mileage.toIntOrNull() != null
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope             = rememberCoroutineScope()
+
     LaunchedEffect(Unit) { if (makes.isEmpty()) vm.loadMakes() }
     LaunchedEffect(make) { if (make.isNotBlank()) vm.loadModels(make) }
 
@@ -119,7 +126,7 @@ fun AddEditVehicleScreen(
             if (it < 1900 || it > currentYear + 1) "Year must be 1900–$currentYear" else ""
         } ?: "Enter a valid year"
         mileageError = mileage.toIntOrNull()?.let {
-            if (it < 0) "Mileage must be >= 0" else ""
+            if (it < 0) "Mileage must be ≥ 0" else ""
         } ?: "Enter valid mileage"
         return listOf(makeError, modelError, yearError, mileageError).all { it.isEmpty() }
     }
@@ -134,7 +141,8 @@ fun AddEditVehicleScreen(
                 onBack   = { navController.popBackStack() }
             )
         },
-        containerColor = Obsidian
+        containerColor = Obsidian,
+        snackbarHost   = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier            = Modifier.fillMaxSize().background(Obsidian).padding(padding),
@@ -147,7 +155,7 @@ fun AddEditVehicleScreen(
                 ExposedDropdownMenuBox(expanded = makeExpanded, onExpandedChange = { makeExpanded = it }) {
                     OutlinedTextField(
                         value          = makeQuery,
-                        onValueChange  = { makeQuery = it; makeExpanded = true },
+                        onValueChange  = { makeQuery = it; make = it; makeExpanded = true },
                         label          = { Text("Make *") },
                         isError        = makeError.isNotEmpty(),
                         supportingText = { if (makeError.isNotEmpty()) Text(makeError, color = CrimsonAlert) },
@@ -155,13 +163,13 @@ fun AddEditVehicleScreen(
                             if (isLoadingMakes) CircularProgressIndicator(Modifier.size(20.dp), color = GoldPrimary, strokeWidth = 2.dp)
                             else ExposedDropdownMenuDefaults.TrailingIcon(makeExpanded)
                         },
-                        modifier        = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+                        modifier        = Modifier.menuAnchor().fillMaxWidth(),
                         singleLine      = true,
                         colors          = fieldColors,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
-                    val filtered = makes.filter { it.MakeName?.contains(makeQuery, ignoreCase = true) == true }.take(20)
+                    val filtered = makes.filter { (it.MakeName ?: "").contains(makeQuery, ignoreCase = true) }.take(20)
                     if (filtered.isNotEmpty()) {
                         ExposedDropdownMenu(
                             expanded = makeExpanded, onDismissRequest = { makeExpanded = false },
@@ -170,12 +178,7 @@ fun AddEditVehicleScreen(
                             filtered.forEach { m ->
                                 DropdownMenuItem(
                                     text    = { Text(m.MakeName ?: "", color = ChromeWhite) },
-                                    onClick = {
-                                        make = m.MakeName ?: ""
-                                        makeQuery = m.MakeName ?: ""
-                                        model = ""
-                                        makeExpanded = false
-                                    }
+                                    onClick = { make = m.MakeName ?: ""; makeQuery = m.MakeName ?: ""; model = ""; makeExpanded = false }
                                 )
                             }
                         }
@@ -192,7 +195,7 @@ fun AddEditVehicleScreen(
                         isError        = modelError.isNotEmpty(),
                         supportingText = { if (modelError.isNotEmpty()) Text(modelError, color = CrimsonAlert) },
                         trailingIcon   = { ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded) },
-                        modifier       = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+                        modifier       = Modifier.menuAnchor().fillMaxWidth(),
                         singleLine     = true,
                         colors         = fieldColors,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -202,7 +205,7 @@ fun AddEditVehicleScreen(
                         expanded = modelExpanded, onDismissRequest = { modelExpanded = false },
                         modifier = Modifier.background(GunmetalMid)
                     ) {
-                        models.filter { it.ModelName?.contains(model, ignoreCase = true) == true }.take(20).forEach { m ->
+                        models.filter { (it.ModelName ?: "").contains(model, ignoreCase = true) }.take(20).forEach { m ->
                             DropdownMenuItem(
                                 text    = { Text(m.ModelName ?: "", color = ChromeWhite) },
                                 onClick = { model = m.ModelName ?: ""; modelExpanded = false }
@@ -255,8 +258,7 @@ fun AddEditVehicleScreen(
                     OutlinedTextField(
                         value = fuelType, onValueChange = {}, label = { Text("Fuel Type") }, readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(fuelTypeExpanded) },
-                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                        colors = fieldColors
+                        modifier = Modifier.menuAnchor().fillMaxWidth(), colors = fieldColors
                     )
                     ExposedDropdownMenu(expanded = fuelTypeExpanded, onDismissRequest = { fuelTypeExpanded = false },
                         modifier = Modifier.background(GunmetalMid)) {
@@ -279,16 +281,35 @@ fun AddEditVehicleScreen(
                                 nickname = nickname, colour = colour, fuelType = fuelType
                             )
                             if (vehicleId != null) vm.updateVehicle(vehicle) else vm.insertVehicle(vehicle)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (vehicleId != null) "Vehicle updated successfully"
+                                    else "Vehicle saved successfully"
+                                )
+                            }
                             navController.popBackStack()
                         }
                     },
+                    enabled  = isFormValid,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = Obsidian),
-                    shape    = RoundedCornerShape(12.dp)
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = GoldPrimary,
+                        contentColor           = Obsidian,
+                        disabledContainerColor = GunmetalLight,
+                        disabledContentColor   = SilverDim
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         if (vehicleId != null) "UPDATE VEHICLE" else "SAVE VEHICLE",
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, fontSize = 13.sp
+                    )
+                }
+                if (!isFormValid) {
+                    Text(
+                        "Fill in Make, Model, Year and Mileage to continue",
+                        fontSize = 11.sp, color = SilverDim,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                 }
             }
@@ -314,24 +335,60 @@ fun AddEditRecordScreen(
     val existing     = records.find { it.id == recordId }
 
     var serviceType by remember { mutableStateOf(existing?.serviceType ?: SERVICE_TYPES[0]) }
-    var dateText    by remember { mutableStateOf(existing?.let { dateDisplayFmt.format(Date(it.date)) } ?: dateDisplayFmt.format(Date())) }
     var mileage     by remember { mutableStateOf(existing?.mileage?.toString() ?: "") }
     var cost        by remember { mutableStateOf(existing?.cost?.toString() ?: "") }
     var garage      by remember { mutableStateOf(existing?.garage ?: "") }
     var notes       by remember { mutableStateOf(existing?.notes ?: "") }
 
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = existing?.date ?: System.currentTimeMillis()
+    )
+    val selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+    val displayDate = remember(selectedDateMillis) {
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
+    }
+
     var mileageError by remember { mutableStateOf("") }
     var costError    by remember { mutableStateOf("") }
-    var dateError    by remember { mutableStateOf("") }
+
+    val isFormValid = mileage.toIntOrNull() != null && cost.toDoubleOrNull() != null
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope             = rememberCoroutineScope()
 
     fun validate(): Boolean {
-        mileageError = mileage.toIntOrNull()?.let { if (it < 0) "Must be >= 0" else "" } ?: "Enter valid mileage"
-        costError    = cost.toDoubleOrNull()?.let { if (it < 0) "Must be >= 0" else "" } ?: "Enter valid cost"
-        dateError    = try { dateDisplayFmt.parse(dateText); "" } catch (_: Exception) { "Invalid date" }
-        return listOf(mileageError, costError, dateError).all { it.isEmpty() }
+        mileageError = mileage.toIntOrNull()?.let { if (it < 0) "Must be ≥ 0" else "" } ?: "Enter valid mileage"
+        costError    = cost.toDoubleOrNull()?.let { if (it < 0) "Must be ≥ 0" else "" } ?: "Enter valid cost"
+        return listOf(mileageError, costError).all { it.isEmpty() }
     }
 
     val fieldColors = premiumTextFieldColors()
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton    = { TextButton(onClick = { showDatePicker = false }) { Text("OK", color = GoldPrimary) } },
+            dismissButton    = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = SilverMid) } },
+            colors           = DatePickerDefaults.colors(containerColor = GunmetalMid)
+        ) {
+            DatePicker(
+                state  = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor            = GunmetalMid,
+                    titleContentColor         = GoldPrimary,
+                    headlineContentColor      = ChromeWhite,
+                    weekdayContentColor       = SilverDim,
+                    subheadContentColor       = SilverMid,
+                    dayContentColor           = ChromeWhite,
+                    selectedDayContainerColor = GoldPrimary,
+                    selectedDayContentColor   = Obsidian,
+                    todayContentColor         = GoldPrimary,
+                    todayDateBorderColor      = GoldPrimary
+                )
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -341,7 +398,8 @@ fun AddEditRecordScreen(
                 onBack   = { navController.popBackStack() }
             )
         },
-        containerColor = Obsidian
+        containerColor = Obsidian,
+        snackbarHost   = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier            = Modifier.fillMaxSize().background(Obsidian).padding(padding),
@@ -359,14 +417,19 @@ fun AddEditRecordScreen(
             item { SectionLabel("SERVICE TYPE") }
 
             item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp)
+                ) {
                     SERVICE_TYPES.forEach { type ->
                         val selected = serviceType == type
                         Surface(
                             onClick = { serviceType = type },
                             color   = if (selected) GoldPrimary.copy(alpha = 0.15f) else GunmetalMid,
                             shape   = RoundedCornerShape(8.dp),
-                            border  = androidx.compose.foundation.BorderStroke(1.dp, if (selected) GoldPrimary else GunmetalLight)
+                            border  = androidx.compose.foundation.BorderStroke(
+                                1.dp, if (selected) GoldPrimary else GunmetalLight
+                            )
                         ) {
                             Text(
                                 text       = type,
@@ -383,43 +446,49 @@ fun AddEditRecordScreen(
             item { SectionLabel("DETAILS") }
 
             item {
+                OutlinedTextField(
+                    value         = displayDate,
+                    onValueChange = {},
+                    label         = { Text("Date *") },
+                    readOnly      = true,
+                    trailingIcon  = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Filled.DateRange, contentDescription = "Pick date", tint = GoldPrimary)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors   = fieldColors
+                )
+            }
+
+            item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
-                        value = dateText, onValueChange = { dateText = it }, label = { Text("Date *") },
-                        isError = dateError.isNotEmpty(),
-                        supportingText = { if (dateError.isNotEmpty()) Text(dateError, color = CrimsonAlert) },
-                        modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                    )
-                    OutlinedTextField(
-                        value = mileage, onValueChange = { mileage = it }, label = { Text("Mileage") },
+                        value = mileage, onValueChange = { mileage = it }, label = { Text("Mileage *") },
                         isError = mileageError.isNotEmpty(),
                         supportingText = { if (mileageError.isNotEmpty()) Text(mileageError, color = CrimsonAlert) },
                         modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
-                }
-            }
-
-            item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
-                        value = cost, onValueChange = { cost = it }, label = { Text("Cost (GBP)") },
+                        value = cost, onValueChange = { cost = it }, label = { Text("Cost (£) *") },
                         isError = costError.isNotEmpty(),
                         supportingText = { if (costError.isNotEmpty()) Text(costError, color = CrimsonAlert) },
                         modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
-                    OutlinedTextField(
-                        value = garage, onValueChange = { garage = it }, label = { Text("Garage") },
-                        modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                    )
                 }
+            }
+
+            item {
+                OutlinedTextField(
+                    value = garage, onValueChange = { garage = it }, label = { Text("Garage") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
             }
 
             item {
@@ -436,23 +505,45 @@ fun AddEditRecordScreen(
                 Button(
                     onClick = {
                         if (validate()) {
-                            val parsedDate = try { dateDisplayFmt.parse(dateText)?.time } catch (_: Exception) { null } ?: System.currentTimeMillis()
                             val record = ServiceRecord(
-                                id = recordId ?: 0L, vehicleId = vehicleId, serviceType = serviceType,
-                                date = parsedDate, mileage = mileage.toIntOrNull() ?: 0,
-                                cost = cost.toDoubleOrNull() ?: 0.0, garage = garage, notes = notes
+                                id          = recordId ?: 0L,
+                                vehicleId   = vehicleId,
+                                serviceType = serviceType,
+                                date        = selectedDateMillis,
+                                mileage     = mileage.toIntOrNull() ?: 0,
+                                cost        = cost.toDoubleOrNull() ?: 0.0,
+                                garage      = garage,
+                                notes       = notes
                             )
                             if (recordId != null) vm.updateRecord(record) else vm.insertRecord(record)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (recordId != null) "Record updated" else "$serviceType logged successfully"
+                                )
+                            }
                             navController.popBackStack()
                         }
                     },
+                    enabled  = isFormValid,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = Obsidian),
-                    shape    = RoundedCornerShape(12.dp)
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = GoldPrimary,
+                        contentColor           = Obsidian,
+                        disabledContainerColor = GunmetalLight,
+                        disabledContentColor   = SilverDim
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         if (recordId != null) "UPDATE RECORD" else "SAVE RECORD",
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, fontSize = 13.sp
+                    )
+                }
+                if (!isFormValid) {
+                    Text(
+                        "Enter mileage and cost to continue",
+                        fontSize = 11.sp, color = SilverDim,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                 }
             }
@@ -463,7 +554,6 @@ fun AddEditRecordScreen(
 // ═══════════════════════════════════════════════════════════════
 // ADD / EDIT FUEL ENTRY
 // ═══════════════════════════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditFuelScreen(
     navController: NavController,
@@ -477,13 +567,21 @@ fun AddEditFuelScreen(
     val entries      by vm.fuelForVehicle(vehicleId).collectAsStateWithLifecycle(emptyList())
     val existing     = entries.find { it.id == entryId }
 
-    var dateText     by remember { mutableStateOf(existing?.let { dateDisplayFmt.format(Date(it.date)) } ?: dateDisplayFmt.format(Date())) }
     var litres       by remember { mutableStateOf(existing?.litresFilled?.toString() ?: "") }
     var costPerLitre by remember { mutableStateOf(existing?.costPerLitre?.toString() ?: "") }
     var mileage      by remember { mutableStateOf(existing?.mileageAtFill?.toString() ?: "") }
     var fuelType     by remember { mutableStateOf(existing?.fuelType ?: "Petrol") }
     var isFullTank   by remember { mutableStateOf(existing?.isFullTank ?: true) }
     var notes        by remember { mutableStateOf(existing?.notes ?: "") }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = existing?.date ?: System.currentTimeMillis()
+    )
+    val selectedDateMillis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+    val displayDate = remember(selectedDateMillis) {
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
+    }
 
     var fuelTypeExpanded by remember { mutableStateOf(false) }
     var litresError  by remember { mutableStateOf("") }
@@ -493,15 +591,48 @@ fun AddEditFuelScreen(
     val totalCost = (litres.toDoubleOrNull() ?: 0.0) * (costPerLitre.toDoubleOrNull() ?: 0.0)
     val fuelTypes = listOf("Petrol", "Diesel", "Electric", "Hybrid", "LPG")
 
+    val isFormValid = litres.toDoubleOrNull() != null &&
+            costPerLitre.toDoubleOrNull() != null &&
+            mileage.toIntOrNull() != null
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope             = rememberCoroutineScope()
+
     fun validate(): Boolean {
         litresError  = litres.toDoubleOrNull()?.let { if (it <= 0) "Must be > 0" else "" } ?: "Required"
         costError    = costPerLitre.toDoubleOrNull()?.let { if (it <= 0) "Must be > 0" else "" } ?: "Required"
-        mileageError = mileage.toIntOrNull()?.let { if (it < 0) "Must be >= 0" else "" } ?: "Required"
+        mileageError = mileage.toIntOrNull()?.let { if (it < 0) "Must be ≥ 0" else "" } ?: "Required"
         return listOf(litresError, costError, mileageError).all { it.isEmpty() }
     }
 
     val fieldColors = premiumTextFieldColors()
 
+    if (showDatePicker) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton    = { TextButton(onClick = { showDatePicker = false }) { Text("OK", color = GoldPrimary) } },
+            dismissButton    = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = SilverMid) } },
+            colors           = DatePickerDefaults.colors(containerColor = GunmetalMid)
+        ) {
+            @OptIn(ExperimentalMaterial3Api::class)
+            DatePicker(
+                state  = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    containerColor            = GunmetalMid,
+                    titleContentColor         = GoldPrimary,
+                    headlineContentColor      = ChromeWhite,
+                    weekdayContentColor       = SilverDim,
+                    selectedDayContainerColor = GoldPrimary,
+                    selectedDayContentColor   = Obsidian,
+                    todayContentColor         = GoldPrimary,
+                    todayDateBorderColor      = GoldPrimary
+                )
+            )
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
     Scaffold(
         topBar = {
             AutoTrackTopBar(
@@ -510,7 +641,8 @@ fun AddEditFuelScreen(
                 onBack   = { navController.popBackStack() }
             )
         },
-        containerColor = Obsidian
+        containerColor = Obsidian,
+        snackbarHost   = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier            = Modifier.fillMaxSize().background(Obsidian).padding(padding),
@@ -528,22 +660,30 @@ fun AddEditFuelScreen(
             item { SectionLabel("FILL-UP DETAILS") }
 
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = dateText, onValueChange = { dateText = it }, label = { Text("Date *") },
-                        modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                    )
-                    OutlinedTextField(
-                        value = mileage, onValueChange = { mileage = it }, label = { Text("Mileage *") },
-                        isError = mileageError.isNotEmpty(),
-                        supportingText = { if (mileageError.isNotEmpty()) Text(mileageError, color = CrimsonAlert) },
-                        modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                    )
-                }
+                OutlinedTextField(
+                    value         = displayDate,
+                    onValueChange = {},
+                    label         = { Text("Date *") },
+                    readOnly      = true,
+                    trailingIcon  = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Filled.DateRange, contentDescription = "Pick date", tint = GoldPrimary)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors   = fieldColors
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = mileage, onValueChange = { mileage = it }, label = { Text("Mileage at Fill *") },
+                    isError = mileageError.isNotEmpty(),
+                    supportingText = { if (mileageError.isNotEmpty()) Text(mileageError, color = CrimsonAlert) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
             }
 
             item {
@@ -578,19 +718,19 @@ fun AddEditFuelScreen(
                     ) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("TOTAL COST", fontSize = 10.sp, letterSpacing = 1.5.sp, color = SilverDim)
-                            Text("GBP ${"%.2f".format(totalCost)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = GoldPrimary)
+                            Text("£${"%.2f".format(totalCost)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = GoldPrimary)
                         }
                     }
                 }
             }
 
             item {
+                @OptIn(ExperimentalMaterial3Api::class)
                 ExposedDropdownMenuBox(expanded = fuelTypeExpanded, onExpandedChange = { fuelTypeExpanded = it }) {
                     OutlinedTextField(
                         value = fuelType, onValueChange = {}, readOnly = true, label = { Text("Fuel Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(fuelTypeExpanded) },
-                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                        colors = fieldColors
+                        modifier = Modifier.menuAnchor().fillMaxWidth(), colors = fieldColors
                     )
                     ExposedDropdownMenu(expanded = fuelTypeExpanded, onDismissRequest = { fuelTypeExpanded = false },
                         modifier = Modifier.background(GunmetalMid)) {
@@ -631,31 +771,55 @@ fun AddEditFuelScreen(
                 Button(
                     onClick = {
                         if (validate()) {
-                            val parsedDate = try { dateDisplayFmt.parse(dateText)?.time } catch (_: Exception) { null } ?: System.currentTimeMillis()
-                            val litresVal  = litres.toDoubleOrNull() ?: 0.0
-                            val cplVal     = costPerLitre.toDoubleOrNull() ?: 0.0
-                            val lastEntry  = entries.firstOrNull()
+                            val litresVal = litres.toDoubleOrNull() ?: 0.0
+                            val cplVal    = costPerLitre.toDoubleOrNull() ?: 0.0
+                            val lastEntry = entries.firstOrNull()
                             val mpg = if (lastEntry != null && isFullTank && lastEntry.isFullTank) {
                                 val milesDriven = (mileage.toIntOrNull() ?: 0) - lastEntry.mileageAtFill
                                 if (milesDriven > 0 && litresVal > 0) (milesDriven / (litresVal * 0.2199692)) else 0.0
                             } else 0.0
                             val entry = FuelEntry(
-                                id = entryId ?: 0L, vehicleId = vehicleId, date = parsedDate,
-                                litresFilled = litresVal, costPerLitre = cplVal, totalCost = litresVal * cplVal,
-                                mileageAtFill = mileage.toIntOrNull() ?: 0, fuelType = fuelType,
-                                isFullTank = isFullTank, notes = notes, mpg = mpg
+                                id            = entryId ?: 0L,
+                                vehicleId     = vehicleId,
+                                date          = selectedDateMillis,
+                                litresFilled  = litresVal,
+                                costPerLitre  = cplVal,
+                                totalCost     = litresVal * cplVal,
+                                mileageAtFill = mileage.toIntOrNull() ?: 0,
+                                fuelType      = fuelType,
+                                isFullTank    = isFullTank,
+                                notes         = notes,
+                                mpg           = mpg
                             )
                             if (entryId != null) vm.updateFuelEntry(entry) else vm.insertFuelEntry(entry)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (entryId != null) "Fuel entry updated" else "Fuel log saved successfully"
+                                )
+                            }
                             navController.popBackStack()
                         }
                     },
+                    enabled  = isFormValid,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = Obsidian),
-                    shape    = RoundedCornerShape(12.dp)
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = GoldPrimary,
+                        contentColor           = Obsidian,
+                        disabledContainerColor = GunmetalLight,
+                        disabledContentColor   = SilverDim
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         if (entryId != null) "UPDATE ENTRY" else "SAVE FUEL LOG",
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, fontSize = 13.sp
+                    )
+                }
+                if (!isFormValid) {
+                    Text(
+                        "Enter litres, cost per litre and mileage to continue",
+                        fontSize = 11.sp, color = SilverDim,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                 }
             }

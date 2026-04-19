@@ -3,7 +3,7 @@ package com.autotrack
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.autotrack.notifications.scheduleServiceReminder // <-- ADD THIS
+import com.autotrack.notifications.scheduleServiceReminder
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 

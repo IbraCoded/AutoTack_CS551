@@ -38,9 +38,7 @@ fun PreferencesScreen(
     val currencies = listOf("GBP £", "USD $", "EUR €")
 
     Scaffold(
-        topBar = {
-            AutoTrackTopBar(title = "PREFERENCES", showBack = true, onBack = { navController.popBackStack() })
-        },
+        topBar         = { AutoTrackTopBar(title = "PREFERENCES", showBack = true, onBack = { navController.popBackStack() }) },
         containerColor = Obsidian
     ) { padding ->
         LazyColumn(
@@ -49,53 +47,28 @@ fun PreferencesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item { SectionLabel("APPEARANCE") }
-
             item {
                 PremiumPrefCard {
                     PrefSwitchRow("Dark Theme", Icons.Filled.DarkMode, prefs.darkTheme) { vm.setDarkTheme(it) }
                     PrefDivider()
-                    ExposedDropdownMenuBox(
-                        expanded = distanceExpanded,
-                        onExpandedChange = { distanceExpanded = it }
-                    ) {
-                        PrefDropdownRow(
-                            "Distance Unit", Icons.Filled.Speed,
-                            prefs.distanceUnit, distanceExpanded,
-                            Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = distanceExpanded,
-                            onDismissRequest = { distanceExpanded = false },
-                            modifier = Modifier.background(GunmetalMid)
-                        ) {
+                    ExposedDropdownMenuBox(expanded = distanceExpanded, onExpandedChange = { distanceExpanded = it }) {
+                        PrefDropdownRow("Distance Unit", Icons.Filled.Speed, prefs.distanceUnit, distanceExpanded, Modifier.menuAnchor())
+                        ExposedDropdownMenu(expanded = distanceExpanded, onDismissRequest = { distanceExpanded = false },
+                            modifier = Modifier.background(GunmetalMid)) {
                             distUnits.forEach { u ->
-                                DropdownMenuItem(
-                                    text = { Text(u, color = ChromeWhite) },
-                                    onClick = { vm.setDistanceUnit(u); distanceExpanded = false }
-                                )
+                                DropdownMenuItem(text = { Text(u, color = ChromeWhite) },
+                                    onClick = { vm.setDistanceUnit(u); distanceExpanded = false })
                             }
                         }
                     }
                     PrefDivider()
-                    ExposedDropdownMenuBox(
-                        expanded = currencyExpanded,
-                        onExpandedChange = { currencyExpanded = it }
-                    ) {
-                        PrefDropdownRow(
-                            "Currency", Icons.Filled.AttachMoney,
-                            prefs.currency, currencyExpanded,
-                            Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = currencyExpanded,
-                            onDismissRequest = { currencyExpanded = false },
-                            modifier = Modifier.background(GunmetalMid)
-                        ) {
+                    ExposedDropdownMenuBox(expanded = currencyExpanded, onExpandedChange = { currencyExpanded = it }) {
+                        PrefDropdownRow("Currency", Icons.Filled.AttachMoney, prefs.currency, currencyExpanded, Modifier.menuAnchor())
+                        ExposedDropdownMenu(expanded = currencyExpanded, onDismissRequest = { currencyExpanded = false },
+                            modifier = Modifier.background(GunmetalMid)) {
                             currencies.forEach { c ->
-                                DropdownMenuItem(
-                                    text = { Text(c, color = ChromeWhite) },
-                                    onClick = { vm.setCurrency(c); currencyExpanded = false }
-                                )
+                                DropdownMenuItem(text = { Text(c, color = ChromeWhite) },
+                                    onClick = { vm.setCurrency(c); currencyExpanded = false })
                             }
                         }
                     }
@@ -104,31 +77,18 @@ fun PreferencesScreen(
 
             item { Spacer(Modifier.height(4.dp)) }
             item { SectionLabel("NOTIFICATIONS") }
-
             item {
                 PremiumPrefCard {
                     PrefSwitchRow("Service Reminders", Icons.Filled.Notifications, prefs.remindersEnabled) { vm.setRemindersEnabled(it) }
                     if (prefs.remindersEnabled) {
                         PrefDivider()
-                        ExposedDropdownMenuBox(
-                            expanded = intervalExpanded,
-                            onExpandedChange = { intervalExpanded = it }
-                        ) {
-                            PrefDropdownRow(
-                                "Reminder Interval", Icons.Filled.Schedule,
-                                prefs.reminderInterval, intervalExpanded,
-                                Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                            )
-                            ExposedDropdownMenu(
-                                expanded = intervalExpanded,
-                                onDismissRequest = { intervalExpanded = false },
-                                modifier = Modifier.background(GunmetalMid)
-                            ) {
+                        ExposedDropdownMenuBox(expanded = intervalExpanded, onExpandedChange = { intervalExpanded = it }) {
+                            PrefDropdownRow("Reminder Interval", Icons.Filled.Schedule, prefs.reminderInterval, intervalExpanded, Modifier.menuAnchor())
+                            ExposedDropdownMenu(expanded = intervalExpanded, onDismissRequest = { intervalExpanded = false },
+                                modifier = Modifier.background(GunmetalMid)) {
                                 intervals.forEach { i ->
-                                    DropdownMenuItem(
-                                        text = { Text(i, color = ChromeWhite) },
-                                        onClick = { vm.setReminderInterval(i); intervalExpanded = false }
-                                    )
+                                    DropdownMenuItem(text = { Text(i, color = ChromeWhite) },
+                                        onClick = { vm.setReminderInterval(i); intervalExpanded = false })
                                 }
                             }
                         }
@@ -145,15 +105,36 @@ fun PreferencesScreen(
                             Text("Overdue threshold (days)", color = SilverMid, fontSize = 13.sp)
                             OutlinedTextField(
                                 value         = thresholdText,
-                                onValueChange = { v ->
-                                    thresholdText = v
-                                    v.toIntOrNull()?.let { d -> vm.setOverdueThreshold(d) }
+                                onValueChange = {
+                                    thresholdText = it
+                                    it.toIntOrNull()?.let { d -> vm.setOverdueThreshold(d) }
                                 },
                                 modifier   = Modifier.width(80.dp),
                                 singleLine = true,
                                 colors     = premiumTextFieldColors()
                             )
                         }
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(4.dp)) }
+            item { SectionLabel("SENSORS") }
+            item {
+                PremiumPrefCard {
+                    PrefSwitchRow(
+                        label           = "Shake to Log Service",
+                        icon            = Icons.Filled.Vibration,
+                        checked         = prefs.shakeEnabled,
+                        onCheckedChange = { vm.setShakeEnabled(it) }
+                    )
+                    PrefDivider()
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(
+                            "Shake your phone to quickly open the Log Service screen",
+                            color    = SilverDim,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }

@@ -1,31 +1,118 @@
 package com.autotrack
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.autotrack.navigation.AutoTrackNavGraph
+import com.autotrack.navigation.Screen
+import com.autotrack.notifications.triggerMileageAlert
 import com.autotrack.ui.theme.AutoTrackTheme
 import com.autotrack.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private var shakeCallback: (() -> Unit)? = null
+
+    private val shakeListener = object : SensorEventListener {
+        private var lastShakeTime = 0L
+        private val shakeThreshold = 800f
+
+        override fun onSensorChanged(event: SensorEvent) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            val acceleration = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+            val now = System.currentTimeMillis()
+            if (acceleration > shakeThreshold && now - lastShakeTime > 1000) {
+                lastShakeTime = now
+                shakeCallback?.invoke()
+            }
+        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         enableEdgeToEdge()
+
         setContent {
             val vm: MainViewModel = hiltViewModel()
             val prefs by vm.preferences.collectAsStateWithLifecycle()
+            val navController = rememberNavController()
+
+            LaunchedEffect(prefs.shakeEnabled) {
+                if (prefs.shakeEnabled) {
+                    shakeCallback = {
+                        val firstVehicle = vm.vehicles.value.firstOrNull()
+                        if (firstVehicle != null) {
+                            navController.navigate(
+                                Screen.AddEditRecord.createRoute(firstVehicle.id)
+                            )
+                        }
+                    }
+                    accelerometer?.let {
+                        sensorManager.registerListener(
+                            shakeListener, it, SensorManager.SENSOR_DELAY_UI
+                        )
+                    }
+                } else {
+                    shakeCallback = null
+                    sensorManager.unregisterListener(shakeListener)
+                }
+            }
+
+            val predictions by vm.servicePredictions.collectAsStateWithLifecycle()
+            val scope = rememberCoroutineScope()
+            LaunchedEffect(predictions) {
+                if (predictions.isNotEmpty()) {
+                    predictions.filter {
+                        it.isOverdue && prefs.mileageAlertsEnabled
+                    }.firstOrNull()?.let { pred ->
+                        scope.launch {
+                            triggerMileageAlert(
+                                context     = this@MainActivity,
+                                vehicleId   = pred.vehicle.id,
+                                vehicleName = "${pred.vehicle.make} ${pred.vehicle.model}",
+                                serviceType = pred.serviceType
+                            )
+                        }
+                    }
+                }
+            }
 
             AutoTrackTheme(darkTheme = prefs.darkTheme) {
-                val navController = rememberNavController()
                 AutoTrackNavGraph(navController = navController)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        accelerometer?.let {
+            sensorManager.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(shakeListener)
     }
 }
