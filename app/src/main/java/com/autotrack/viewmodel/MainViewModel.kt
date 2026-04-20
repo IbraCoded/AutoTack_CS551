@@ -145,12 +145,8 @@ class MainViewModel @Inject constructor(
                     predictedDate = lastRecord.date + (intervalDays * dayMs)
                     predictedMileage = lastRecord.mileage + intervalMiles
                 } else {
-                    // FALLBACK: When no history exists, predict from NOW or next major milestone.
-                    // This prevents "unrealistic" ancient dates (e.g., from 2011) for older cars.
                     predictedDate = now + (intervalDays * dayMs)
-                    
                     predictedMileage = if (intervalMiles > 0) {
-                        // Round up to the next major interval milestone based on current mileage
                         ((vehicle.mileage / intervalMiles) + 1) * intervalMiles
                     } else {
                         vehicle.mileage
@@ -181,11 +177,15 @@ class MainViewModel @Inject constructor(
         return predictions.sortedBy { it.daysUntilDue }
     }
 
-    fun healthScore(vehicleId: Long): Int {
-        vehicles.value.find { it.id == vehicleId } ?: return 50
-        val preds = servicePredictions.value.filter { it.vehicle.id == vehicleId }
+    /**
+     * Returns a reactive Flow for the health score of a specific vehicle.
+     */
+    fun getHealthScoreFlow(vehicleId: Long): Flow<Int> = servicePredictions.map { allPreds ->
+        val vehiclePreds = allPreds.filter { it.vehicle.id == vehicleId }
+        if (vehiclePreds.isEmpty()) return@map 100
+        
         var score = 100
-        for (p in preds) {
+        for (p in vehiclePreds) {
             score -= when {
                 p.isOverdue -> 15
                 p.daysUntilDue < 7 -> 10
@@ -193,7 +193,7 @@ class MainViewModel @Inject constructor(
                 else -> 0
             }
         }
-        return score.coerceIn(0, 100)
+        score.coerceIn(0, 100)
     }
 
     fun setDarkTheme(enabled: Boolean) =

@@ -88,9 +88,10 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = hiltViewModel()
             ) {
                 // Hero card
                 item {
+                    val score by vm.getHealthScoreFlow(primary.id).collectAsStateWithLifecycle(100)
                     HeroVehicleCard(
                         vehicle     = primary,
-                        score       = vm.healthScore(primary.id),
+                        score       = score,
                         worstDays   = predictions.filter { it.vehicle.id == primary.id }
                             .minByOrNull { it.daysUntilDue }?.daysUntilDue,
                         totalSpend  = totalSpend,
@@ -107,7 +108,7 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = hiltViewModel()
                         SectionLabel("OTHER VEHICLES")
                     }
                     items(rest, key = { it.id }) { vehicle ->
-                        val score    = vm.healthScore(vehicle.id)
+                        val score by vm.getHealthScoreFlow(vehicle.id).collectAsStateWithLifecycle(100)
                         val worstDay = predictions.filter { it.vehicle.id == vehicle.id }
                             .minByOrNull { it.daysUntilDue }?.daysUntilDue
                         CompactVehicleCard(
@@ -134,7 +135,6 @@ fun HeroVehicleCard(
 
     val amber = if (dark) AmberDark else AmberLight
     val bg    = if (dark) DarkCard  else LightCard
-    val bord  = if (dark) DarkCardBorder else LightCardBorder
     val on    = if (dark) DarkTextPrimary else LightTextPrimary
     val sub   = if (dark) DarkTextSecondary else LightTextSecondary
     val green = if (dark) GreenDark else GreenAccent
@@ -189,8 +189,8 @@ fun HeroVehicleCard(
             Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Text("${vehicle.year} ${vehicle.make} ${vehicle.model}".uppercase(),
                     fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, letterSpacing = 0.4.sp, color = on)
-                if (!vehicle.nickname.isNullOrBlank()) {
-                    Text(vehicle.nickname!!, fontSize = 12.sp, color = amber, fontWeight = FontWeight.Medium)
+                if (vehicle.nickname.isNotBlank()) {
+                    Text(vehicle.nickname, fontSize = 12.sp, color = amber, fontWeight = FontWeight.Medium)
                 }
                 Text("${vehicle.mileage} mi  ·  ${vehicle.fuelType}",
                     color = sub, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
@@ -248,8 +248,8 @@ fun CompactVehicleCard(
                 Text("${vehicle.make} ${vehicle.model}".uppercase(),
                     fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 0.4.sp, color = on)
                 Text("${vehicle.year}  ·  ${vehicle.mileage} mi", color = sub, fontSize = 12.sp)
-                if (!vehicle.nickname.isNullOrBlank()) {
-                    Text(vehicle.nickname!!, fontSize = 11.sp, color = amber.copy(alpha = 0.8f))
+                if (vehicle.nickname.isNotBlank()) {
+                    Text(vehicle.nickname, fontSize = 11.sp, color = amber.copy(alpha = 0.8f))
                 }
                 if (worstDays != null) { Spacer(Modifier.height(4.dp)); UrgencyBadge(worstDays) }
             }
@@ -272,12 +272,12 @@ fun DeleteVehicleDialog(vehicle: Vehicle, onConfirm: () -> Unit, onDismiss: () -
         text   = { Text("Delete ${vehicle.make} ${vehicle.model}? All records will be permanently removed.") },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("DELETE", color = if (dark) RedDark else RedAccent, fontWeight = FontWeight.Bold)
+                Text("DELETE", color = RedAccent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = if (dark) DarkTextSecondary else LightTextSecondary)
+                Text("CANCEL", color = if (dark) DarkTextMuted else LightTextMuted)
             }
         }
     )

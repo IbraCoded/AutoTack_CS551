@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
     private var shakeCallback: (() -> Unit)? = null
+    private var isShakeEnabled: Boolean = false
 
     private val shakeListener = object : SensorEventListener {
         private var lastShakeTime = 0L
@@ -61,18 +62,23 @@ class MainActivity : ComponentActivity() {
             val vm: MainViewModel = hiltViewModel()
             val prefs by vm.preferences.collectAsStateWithLifecycle()
             val navController = rememberNavController()
+            
+            // Sync local variable for lifecycle methods
+            isShakeEnabled = prefs.shakeEnabled
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                val notifPermission = com.google.accompanist.permissions.rememberPermissionState(
+                val notifPermission = rememberPermissionState(
                     android.Manifest.permission.POST_NOTIFICATIONS
                 )
-                LaunchedEffect(notifPermission.status.isGranted) {
+                LaunchedEffect(Unit) {
                     if (!notifPermission.status.isGranted) {
                         notifPermission.launchPermissionRequest()
                     }
                 }
             }
 
-            LaunchedEffect(prefs.shakeEnabled) {                if (prefs.shakeEnabled) {
+            LaunchedEffect(prefs.shakeEnabled) {
+                if (prefs.shakeEnabled) {
                     shakeCallback = {
                         val firstVehicle = vm.vehicles.value.firstOrNull()
                         if (firstVehicle != null) {
@@ -81,31 +87,29 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-                    accelerometer?.let {
-                        sensorManager.registerListener(
-                            shakeListener, it, SensorManager.SENSOR_DELAY_UI
-                        )
-                    }
+                    registerShake()
                 } else {
                     shakeCallback = null
-                    sensorManager.unregisterListener(shakeListener)
+                    unregisterShake()
                 }
             }
 
             val predictions by vm.servicePredictions.collectAsStateWithLifecycle()
-            val scope = rememberCoroutineScope()
+            
+            // Notification logic moved to a side effect that only triggers once per overdue item
+            val shownAlerts = remember { mutableStateSetOf<String>() }
             LaunchedEffect(predictions) {
-                if (predictions.isNotEmpty()) {
-                    predictions.filter {
-                        it.isOverdue && prefs.mileageAlertsEnabled
-                    }.firstOrNull()?.let { pred ->
-                        scope.launch {
+                if (prefs.mileageAlertsEnabled) {
+                    predictions.filter { it.isOverdue }.forEach { pred ->
+                        val alertKey = "${pred.vehicle.id}_${pred.serviceType}"
+                        if (!shownAlerts.contains(alertKey)) {
                             triggerMileageAlert(
                                 context     = this@MainActivity,
                                 vehicleId   = pred.vehicle.id,
                                 vehicleName = "${pred.vehicle.make} ${pred.vehicle.model}",
                                 serviceType = pred.serviceType
                             )
+                            shownAlerts.add(alertKey)
                         }
                     }
                 }
@@ -117,15 +121,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun registerShake() {
+        if (isShakeEnabled) {
+            accelerometer?.let {
+                sensorManager.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
+            }
+        }
+    }
+
+    private fun unregisterShake() {
+        sensorManager.unregisterListener(shakeListener)
+    }
+
     override fun onResume() {
         super.onResume()
-        accelerometer?.let {
-            sensorManager.registerListener(shakeListener, it, SensorManager.SENSOR_DELAY_UI)
-        }
+        registerShake()
     }
 
     override fun onPause() {
         super.onPause()
-        sensorManager.unregisterListener(shakeListener)
+        unregisterShake()
     }
 }

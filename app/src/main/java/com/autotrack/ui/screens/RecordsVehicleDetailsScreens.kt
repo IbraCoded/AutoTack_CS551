@@ -247,7 +247,7 @@ fun VehicleDetailScreen(navController: NavController, vehicleId: Long, vm: MainV
     val totalSpend  by vm.totalSpend(vehicleId).collectAsStateWithLifecycle(null)
     val predictions by vm.servicePredictions.collectAsStateWithLifecycle()
     val nextService  = predictions.filter { it.vehicle.id == vehicleId }.minByOrNull { it.daysUntilDue }
-    val score        = vm.healthScore(vehicleId)
+    val score        by vm.getHealthScoreFlow(vehicleId).collectAsStateWithLifecycle(100)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
