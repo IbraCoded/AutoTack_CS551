@@ -29,7 +29,9 @@ data class ServicePrediction(
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repo: AutoTrackRepository,
-    val prefsRepo: PreferencesRepository
+    val prefsRepo: PreferencesRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext
+    private val appContext: android.content.Context
 ) : ViewModel() {
 
     val vehicles: StateFlow<List<Vehicle>> = repo.getAllVehicles()
@@ -39,8 +41,10 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val preferences = prefsRepo.preferences
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
-            com.autotrack.data.local.repository.AppPreferences())
+        .stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5000),
+            com.autotrack.data.local.repository.AppPreferences()
+        )
 
     private val _makes = MutableStateFlow<List<NhtsaMake>>(emptyList())
     val makes: StateFlow<List<NhtsaMake>> = _makes
@@ -95,11 +99,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repo.deleteFuelEntry(entry) }
 
     fun recordsForVehicle(vehicleId: Long) = repo.getRecordsForVehicle(vehicleId)
-    fun fuelForVehicle(vehicleId: Long)    = repo.getFuelEntries(vehicleId)
-    fun totalSpend(vehicleId: Long)        = repo.getTotalSpend(vehicleId)
-    fun avgMpg(vehicleId: Long)            = repo.getAverageMpg(vehicleId)
-    fun recordCount(vehicleId: Long)       = repo.getRecordCount(vehicleId)
-    fun fuelCount(vehicleId: Long)         = repo.getFuelCount(vehicleId)
+    fun fuelForVehicle(vehicleId: Long) = repo.getFuelEntries(vehicleId)
+    fun totalSpend(vehicleId: Long) = repo.getTotalSpend(vehicleId)
+    fun avgMpg(vehicleId: Long) = repo.getAverageMpg(vehicleId)
+    fun recordCount(vehicleId: Long) = repo.getRecordCount(vehicleId)
+    fun fuelCount(vehicleId: Long) = repo.getFuelCount(vehicleId)
 
     val servicePredictions: StateFlow<List<ServicePrediction>> = combine(
         vehicles, allRecords
@@ -108,19 +112,19 @@ class MainViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val defaultIntervals = mapOf(
-        "Oil Change"     to Pair(365, 10000),
-        "Tyre Rotation"  to Pair(180, 8000),
-        "MOT"            to Pair(365, 0),
-        "Brake Check"    to Pair(365, 20000),
-        "Air Filter"     to Pair(730, 20000),
-        "Coolant"        to Pair(730, 30000)
+        "Oil Change" to Pair(365, 10000),
+        "Tyre Rotation" to Pair(180, 8000),
+        "MOT" to Pair(365, 0),
+        "Brake Check" to Pair(365, 20000),
+        "Air Filter" to Pair(730, 20000),
+        "Coolant" to Pair(730, 30000)
     )
 
     private fun generatePredictions(
         vehicleList: List<Vehicle>,
         records: List<ServiceRecord>
     ): List<ServicePrediction> {
-        val now   = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
         val dayMs = 86_400_000L
         val predictions = mutableListOf<ServicePrediction>()
 
@@ -136,32 +140,34 @@ class MainViewModel @Inject constructor(
                 val predictedMileage: Int
 
                 if (lastRecord != null) {
-                    predictedDate    = lastRecord.date + (intervalDays * dayMs)
+                    predictedDate = lastRecord.date + (intervalDays * dayMs)
                     predictedMileage = lastRecord.mileage + intervalMiles
                 } else {
                     val cal = Calendar.getInstance()
                     cal.set(vehicle.year, 0, 1)
-                    predictedDate    = cal.timeInMillis + (intervalDays * dayMs)
+                    predictedDate = cal.timeInMillis + (intervalDays * dayMs)
                     predictedMileage = vehicle.mileage + intervalMiles
                 }
 
-                val daysUntil  = ((predictedDate - now) / dayMs).toInt()
-                val isOverdue  = daysUntil < 0
+                val daysUntil = ((predictedDate - now) / dayMs).toInt()
+                val isOverdue = daysUntil < 0
                 val confidence = when {
-                    lastRecord != null                 -> "HIGH"
+                    lastRecord != null -> "HIGH"
                     abs(daysUntil) < intervalDays / 2 -> "MED"
-                    else                              -> "LOW"
+                    else -> "LOW"
                 }
 
-                predictions.add(ServicePrediction(
-                    vehicle             = vehicle,
-                    serviceType         = serviceType,
-                    predictedDueDate    = predictedDate,
-                    predictedDueMileage = predictedMileage,
-                    confidence          = confidence,
-                    isOverdue           = isOverdue,
-                    daysUntilDue        = daysUntil
-                ))
+                predictions.add(
+                    ServicePrediction(
+                        vehicle = vehicle,
+                        serviceType = serviceType,
+                        predictedDueDate = predictedDate,
+                        predictedDueMileage = predictedMileage,
+                        confidence = confidence,
+                        isOverdue = isOverdue,
+                        daysUntilDue = daysUntil
+                    )
+                )
             }
         }
         return predictions.sortedBy { it.daysUntilDue }
@@ -173,21 +179,42 @@ class MainViewModel @Inject constructor(
         var score = 100
         for (p in preds) {
             score -= when {
-                p.isOverdue         -> 15
-                p.daysUntilDue < 7  -> 10
+                p.isOverdue -> 15
+                p.daysUntilDue < 7 -> 10
                 p.daysUntilDue < 30 -> 5
-                else                -> 0
+                else -> 0
             }
         }
         return score.coerceIn(0, 100)
     }
 
-    fun setDarkTheme(enabled: Boolean)       = viewModelScope.launch { prefsRepo.updateDarkTheme(enabled) }
-    fun setDistanceUnit(unit: String)        = viewModelScope.launch { prefsRepo.updateDistanceUnit(unit) }
-    fun setCurrency(currency: String)        = viewModelScope.launch { prefsRepo.updateCurrency(currency) }
-    fun setRemindersEnabled(enabled: Boolean)= viewModelScope.launch { prefsRepo.updateRemindersEnabled(enabled) }
-    fun setReminderInterval(interval: String)= viewModelScope.launch { prefsRepo.updateReminderInterval(interval) }
-    fun setMileageAlerts(enabled: Boolean)   = viewModelScope.launch { prefsRepo.updateMileageAlerts(enabled) }
-    fun setOverdueThreshold(days: Int)       = viewModelScope.launch { prefsRepo.updateOverdueThreshold(days) }
-    fun setShakeEnabled(enabled: Boolean)    = viewModelScope.launch { prefsRepo.updateShakeEnabled(enabled) }
+    fun setDarkTheme(enabled: Boolean) =
+        viewModelScope.launch { prefsRepo.updateDarkTheme(enabled) }
+
+    fun setDistanceUnit(unit: String) = viewModelScope.launch { prefsRepo.updateDistanceUnit(unit) }
+    fun setCurrency(currency: String) = viewModelScope.launch { prefsRepo.updateCurrency(currency) }
+    fun setRemindersEnabled(enabled: Boolean) =
+        viewModelScope.launch { prefsRepo.updateRemindersEnabled(enabled) }
+
+    fun setReminderInterval(interval: String) =
+        viewModelScope.launch {
+            prefsRepo.updateReminderInterval(interval)
+            val days = when (interval) {
+                "Daily" -> 1L
+                "Weekly" -> 7L
+                "Fortnightly" -> 14L
+                "Monthly" -> 30L
+                else -> 7L
+            }
+            com.autotrack.notifications.scheduleServiceReminder(appContext, days)
+        }
+
+    fun setMileageAlerts(enabled: Boolean) =
+        viewModelScope.launch { prefsRepo.updateMileageAlerts(enabled) }
+
+    fun setOverdueThreshold(days: Int) =
+        viewModelScope.launch { prefsRepo.updateOverdueThreshold(days) }
+
+    fun setShakeEnabled(enabled: Boolean) =
+        viewModelScope.launch { prefsRepo.updateShakeEnabled(enabled) }
 }

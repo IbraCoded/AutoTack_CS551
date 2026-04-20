@@ -1,5 +1,9 @@
 package com.autotrack.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -24,12 +30,18 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.autotrack.data.local.entity.FuelEntry
 import com.autotrack.data.local.entity.ServiceRecord
 import com.autotrack.data.local.entity.Vehicle
 import com.autotrack.ui.components.AutoTrackTopBar
 import com.autotrack.ui.theme.*
+import com.autotrack.util.createImageUri
+import com.autotrack.util.fetchLocation
 import com.autotrack.viewmodel.MainViewModel
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -72,10 +84,9 @@ fun SectionLabel(text: String) {
     )
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADD / EDIT VEHICLE
-// ═══════════════════════════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class)
+//
+// ADD / EDIT VEHICLE SCREEN
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun AddEditVehicleScreen(
     navController: NavController,
@@ -83,6 +94,7 @@ fun AddEditVehicleScreen(
     vm: MainViewModel = hiltViewModel()
 ) {
     val focusManager   = LocalFocusManager.current
+    val context        = LocalContext.current
     val makes          by vm.makes.collectAsStateWithLifecycle()
     val models         by vm.models.collectAsStateWithLifecycle()
     val isLoadingMakes by vm.isLoadingMakes.collectAsStateWithLifecycle()
@@ -96,6 +108,7 @@ fun AddEditVehicleScreen(
     var nickname  by remember { mutableStateOf(existing?.nickname ?: "") }
     var colour    by remember { mutableStateOf(existing?.colour   ?: "") }
     var fuelType  by remember { mutableStateOf(existing?.fuelType ?: "Petrol") }
+    var photoUri  by remember { mutableStateOf(existing?.photoUri ?: "") }
 
     var makeExpanded     by remember { mutableStateOf(false) }
     var modelExpanded    by remember { mutableStateOf(false) }
@@ -112,6 +125,24 @@ fun AddEditVehicleScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
+
+    // Camera permission
+    val cameraPermission = rememberPermissionState(
+        android.Manifest.permission.CAMERA
+    )
+
+    // Camera + gallery launchers
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) pendingCameraUri?.let { photoUri = it.toString() }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { photoUri = it.toString() } }
 
     LaunchedEffect(Unit) { if (makes.isEmpty()) vm.loadMakes() }
     LaunchedEffect(make) { if (make.isNotBlank()) vm.loadModels(make) }
@@ -169,16 +200,24 @@ fun AddEditVehicleScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
-                    val filtered = makes.filter { (it.MakeName ?: "").contains(makeQuery, ignoreCase = true) }.take(20)
+                    val filtered = makes.filter {
+                        (it.MakeName ?: "").contains(makeQuery, ignoreCase = true)
+                    }.take(20)
                     if (filtered.isNotEmpty()) {
                         ExposedDropdownMenu(
-                            expanded = makeExpanded, onDismissRequest = { makeExpanded = false },
-                            modifier = Modifier.background(GunmetalMid)
+                            expanded         = makeExpanded,
+                            onDismissRequest = { makeExpanded = false },
+                            modifier         = Modifier.background(GunmetalMid)
                         ) {
                             filtered.forEach { m ->
                                 DropdownMenuItem(
                                     text    = { Text(m.MakeName ?: "", color = ChromeWhite) },
-                                    onClick = { make = m.MakeName ?: ""; makeQuery = m.MakeName ?: ""; model = ""; makeExpanded = false }
+                                    onClick = {
+                                        make = m.MakeName ?: ""
+                                        makeQuery = m.MakeName ?: ""
+                                        model = ""
+                                        makeExpanded = false
+                                    }
                                 )
                             }
                         }
@@ -202,10 +241,13 @@ fun AddEditVehicleScreen(
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
                     ExposedDropdownMenu(
-                        expanded = modelExpanded, onDismissRequest = { modelExpanded = false },
-                        modifier = Modifier.background(GunmetalMid)
+                        expanded         = modelExpanded,
+                        onDismissRequest = { modelExpanded = false },
+                        modifier         = Modifier.background(GunmetalMid)
                     ) {
-                        models.filter { (it.ModelName ?: "").contains(model, ignoreCase = true) }.take(20).forEach { m ->
+                        models.filter {
+                            (it.ModelName ?: "").contains(model, ignoreCase = true)
+                        }.take(20).forEach { m ->
                             DropdownMenuItem(
                                 text    = { Text(m.ModelName ?: "", color = ChromeWhite) },
                                 onClick = { model = m.ModelName ?: ""; modelExpanded = false }
@@ -260,12 +302,75 @@ fun AddEditVehicleScreen(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(fuelTypeExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(), colors = fieldColors
                     )
-                    ExposedDropdownMenu(expanded = fuelTypeExpanded, onDismissRequest = { fuelTypeExpanded = false },
-                        modifier = Modifier.background(GunmetalMid)) {
+                    ExposedDropdownMenu(
+                        expanded         = fuelTypeExpanded,
+                        onDismissRequest = { fuelTypeExpanded = false },
+                        modifier         = Modifier.background(GunmetalMid)
+                    ) {
                         fuelTypes.forEach { ft ->
-                            DropdownMenuItem(text = { Text(ft, color = ChromeWhite) },
-                                onClick = { fuelType = ft; fuelTypeExpanded = false })
+                            DropdownMenuItem(
+                                text    = { Text(ft, color = ChromeWhite) },
+                                onClick = { fuelType = ft; fuelTypeExpanded = false }
+                            )
                         }
+                    }
+                }
+            }
+
+            // Vehicle photo
+            item { SectionLabel("VEHICLE PHOTO") }
+
+            item {
+                if (photoUri.isNotBlank()) {
+                    AsyncImage(
+                        model              = photoUri,
+                        contentDescription = "Vehicle photo",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .background(GunmetalMid, RoundedCornerShape(12.dp))
+                            .border(1.dp, GoldDim.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (cameraPermission.status.isGranted) {
+                                val uri = createImageUri(context)
+                                pendingCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                cameraPermission.launchPermissionRequest()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, GoldDim)
+                    ) {
+                        Icon(Icons.Filled.PhotoCamera, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Camera", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick  = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, GoldDim)
+                    ) {
+                        Icon(Icons.Filled.Photo, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Gallery", fontSize = 12.sp)
                     }
                 }
             }
@@ -276,11 +381,18 @@ fun AddEditVehicleScreen(
                     onClick = {
                         if (validate()) {
                             val vehicle = Vehicle(
-                                id = vehicleId ?: 0L, make = make, model = model,
-                                year = year.toInt(), mileage = mileage.toIntOrNull() ?: 0,
-                                nickname = nickname, colour = colour, fuelType = fuelType
+                                id       = vehicleId ?: 0L,
+                                make     = make,
+                                model    = model,
+                                year     = year.toInt(),
+                                mileage  = mileage.toIntOrNull() ?: 0,
+                                nickname = nickname,
+                                colour   = colour,
+                                fuelType = fuelType,
+                                photoUri = photoUri
                             )
-                            if (vehicleId != null) vm.updateVehicle(vehicle) else vm.insertVehicle(vehicle)
+                            if (vehicleId != null) vm.updateVehicle(vehicle)
+                            else vm.insertVehicle(vehicle)
                             scope.launch {
                                 snackbarHostState.showSnackbar(
                                     if (vehicleId != null) "Vehicle updated successfully"
@@ -317,10 +429,9 @@ fun AddEditVehicleScreen(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADD / EDIT SERVICE RECORD
-// ═══════════════════════════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class)
+
+// ADD / EDIT SERVICE RECORD SCREEN
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun AddEditRecordScreen(
     navController: NavController,
@@ -329,16 +440,19 @@ fun AddEditRecordScreen(
     vm: MainViewModel = hiltViewModel()
 ) {
     val focusManager = LocalFocusManager.current
+    val context      = LocalContext.current
     val vehicles     by vm.vehicles.collectAsStateWithLifecycle()
     val vehicle      = vehicles.find { it.id == vehicleId }
     val records      by vm.recordsForVehicle(vehicleId).collectAsStateWithLifecycle(emptyList())
     val existing     = records.find { it.id == recordId }
 
-    var serviceType by remember { mutableStateOf(existing?.serviceType ?: SERVICE_TYPES[0]) }
-    var mileage     by remember { mutableStateOf(existing?.mileage?.toString() ?: "") }
-    var cost        by remember { mutableStateOf(existing?.cost?.toString() ?: "") }
-    var garage      by remember { mutableStateOf(existing?.garage ?: "") }
-    var notes       by remember { mutableStateOf(existing?.notes ?: "") }
+    var serviceType    by remember { mutableStateOf(existing?.serviceType ?: SERVICE_TYPES[0]) }
+    var mileage        by remember { mutableStateOf(existing?.mileage?.toString() ?: "") }
+    var cost           by remember { mutableStateOf(existing?.cost?.toString() ?: "") }
+    var garage         by remember { mutableStateOf(existing?.garage ?: "") }
+    var notes          by remember { mutableStateOf(existing?.notes ?: "") }
+    var receiptUri     by remember { mutableStateOf(existing?.receiptPhotoUri ?: "") }
+    var isLocating     by remember { mutableStateOf(false) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
@@ -356,6 +470,29 @@ fun AddEditRecordScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
+
+    // Camera permission
+    val cameraPermission = rememberPermissionState(
+        android.Manifest.permission.CAMERA
+    )
+
+    // GPS permission
+    val locationPermission = rememberPermissionState(
+        android.Manifest.permission.ACCESS_FINE_LOCATION
+    )
+
+    // Camera + gallery launchers
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) pendingCameraUri?.let { receiptUri = it.toString() }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { receiptUri = it.toString() } }
 
     fun validate(): Boolean {
         mileageError = mileage.toIntOrNull()?.let { if (it < 0) "Must be ≥ 0" else "" } ?: "Enter valid mileage"
@@ -408,9 +545,11 @@ fun AddEditRecordScreen(
         ) {
             vehicle?.let {
                 item {
-                    Text("${it.make} ${it.model}".uppercase(),
+                    Text(
+                        "${it.make} ${it.model}".uppercase(),
                         fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                        letterSpacing = 0.8.sp, color = GoldPrimary)
+                        letterSpacing = 0.8.sp, color = GoldPrimary
+                    )
                 }
             }
 
@@ -482,13 +621,62 @@ fun AddEditRecordScreen(
                 }
             }
 
+            // Garage + GPS
             item {
-                OutlinedTextField(
-                    value = garage, onValueChange = { garage = it }, label = { Text("Garage") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value           = garage,
+                        onValueChange   = { garage = it },
+                        label           = { Text("Garage / Location") },
+                        modifier        = Modifier.weight(1f),
+                        singleLine      = true,
+                        colors          = fieldColors,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction      = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        )
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            if (locationPermission.status.isGranted) {
+                                isLocating = true
+                                fetchLocation(context) { address ->
+                                    garage     = address
+                                    isLocating = false
+                                }
+                            } else {
+                                locationPermission.launchPermissionRequest()
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = GoldPrimary
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GoldDim)
+                    ) {
+                        if (isLocating) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(14.dp),
+                                color       = GoldPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.LocationOn,
+                                contentDescription = "Use GPS",
+                                modifier           = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text("GPS", fontSize = 12.sp)
+                    }
+                }
             }
 
             item {
@@ -500,25 +688,86 @@ fun AddEditRecordScreen(
                 )
             }
 
+            // Receipt photo
+            item { SectionLabel("RECEIPT PHOTO") }
+
+            item {
+                if (receiptUri.isNotBlank()) {
+                    AsyncImage(
+                        model              = receiptUri,
+                        contentDescription = "Receipt photo",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .background(GunmetalMid, RoundedCornerShape(12.dp))
+                            .border(1.dp, GoldDim.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (cameraPermission.status.isGranted) {
+                                val uri = createImageUri(context)
+                                pendingCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                cameraPermission.launchPermissionRequest()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, GoldDim)
+                    ) {
+                        Icon(Icons.Filled.PhotoCamera, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Camera", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick  = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, GoldDim)
+                    ) {
+                        Icon(Icons.Filled.Photo, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Gallery", fontSize = 12.sp)
+                    }
+                }
+            }
+
             item {
                 Spacer(Modifier.height(4.dp))
                 Button(
                     onClick = {
                         if (validate()) {
                             val record = ServiceRecord(
-                                id          = recordId ?: 0L,
-                                vehicleId   = vehicleId,
-                                serviceType = serviceType,
-                                date        = selectedDateMillis,
-                                mileage     = mileage.toIntOrNull() ?: 0,
-                                cost        = cost.toDoubleOrNull() ?: 0.0,
-                                garage      = garage,
-                                notes       = notes
+                                id              = recordId ?: 0L,
+                                vehicleId       = vehicleId,
+                                serviceType     = serviceType,
+                                date            = selectedDateMillis,
+                                mileage         = mileage.toIntOrNull() ?: 0,
+                                cost            = cost.toDoubleOrNull() ?: 0.0,
+                                garage          = garage,
+                                notes           = notes,
+                                receiptPhotoUri = receiptUri
                             )
-                            if (recordId != null) vm.updateRecord(record) else vm.insertRecord(record)
+                            if (recordId != null) vm.updateRecord(record)
+                            else vm.insertRecord(record)
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    if (recordId != null) "Record updated" else "$serviceType logged successfully"
+                                    if (recordId != null) "Record updated"
+                                    else "$serviceType logged successfully"
                                 )
                             }
                             navController.popBackStack()
@@ -551,9 +800,8 @@ fun AddEditRecordScreen(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADD / EDIT FUEL ENTRY
-// ═══════════════════════════════════════════════════════════════
+
+// ADD / EDIT FUEL ENTRY SCREEN
 @Composable
 fun AddEditFuelScreen(
     navController: NavController,
@@ -651,9 +899,11 @@ fun AddEditFuelScreen(
         ) {
             vehicle?.let {
                 item {
-                    Text("${it.make} ${it.model}".uppercase(),
+                    Text(
+                        "${it.make} ${it.model}".uppercase(),
                         fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                        letterSpacing = 0.8.sp, color = GoldPrimary)
+                        letterSpacing = 0.8.sp, color = GoldPrimary
+                    )
                 }
             }
 
@@ -677,7 +927,8 @@ fun AddEditFuelScreen(
 
             item {
                 OutlinedTextField(
-                    value = mileage, onValueChange = { mileage = it }, label = { Text("Mileage at Fill *") },
+                    value = mileage, onValueChange = { mileage = it },
+                    label = { Text("Mileage at Fill *") },
                     isError = mileageError.isNotEmpty(),
                     supportingText = { if (mileageError.isNotEmpty()) Text(mileageError, color = CrimsonAlert) },
                     modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors,
@@ -697,7 +948,8 @@ fun AddEditFuelScreen(
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                     )
                     OutlinedTextField(
-                        value = costPerLitre, onValueChange = { costPerLitre = it }, label = { Text("Cost/Litre *") },
+                        value = costPerLitre, onValueChange = { costPerLitre = it },
+                        label = { Text("Cost/Litre *") },
                         isError = costError.isNotEmpty(),
                         supportingText = { if (costError.isNotEmpty()) Text(costError, color = CrimsonAlert) },
                         modifier = Modifier.weight(1f), singleLine = true, colors = fieldColors,
@@ -716,7 +968,11 @@ fun AddEditFuelScreen(
                             .border(1.dp, GoldDim.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
                             Text("TOTAL COST", fontSize = 10.sp, letterSpacing = 1.5.sp, color = SilverDim)
                             Text("£${"%.2f".format(totalCost)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = GoldPrimary)
                         }
@@ -728,15 +984,21 @@ fun AddEditFuelScreen(
                 @OptIn(ExperimentalMaterial3Api::class)
                 ExposedDropdownMenuBox(expanded = fuelTypeExpanded, onExpandedChange = { fuelTypeExpanded = it }) {
                     OutlinedTextField(
-                        value = fuelType, onValueChange = {}, readOnly = true, label = { Text("Fuel Type") },
+                        value = fuelType, onValueChange = {}, readOnly = true,
+                        label = { Text("Fuel Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(fuelTypeExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(), colors = fieldColors
                     )
-                    ExposedDropdownMenu(expanded = fuelTypeExpanded, onDismissRequest = { fuelTypeExpanded = false },
-                        modifier = Modifier.background(GunmetalMid)) {
+                    ExposedDropdownMenu(
+                        expanded         = fuelTypeExpanded,
+                        onDismissRequest = { fuelTypeExpanded = false },
+                        modifier         = Modifier.background(GunmetalMid)
+                    ) {
                         fuelTypes.forEach { ft ->
-                            DropdownMenuItem(text = { Text(ft, color = ChromeWhite) },
-                                onClick = { fuelType = ft; fuelTypeExpanded = false })
+                            DropdownMenuItem(
+                                text    = { Text(ft, color = ChromeWhite) },
+                                onClick = { fuelType = ft; fuelTypeExpanded = false }
+                            )
                         }
                     }
                 }
@@ -745,13 +1007,18 @@ fun AddEditFuelScreen(
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier          = Modifier
+                        .fillMaxWidth()
                         .background(GunmetalMid, RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Checkbox(
-                        checked = isFullTank, onCheckedChange = { isFullTank = it },
-                        colors  = CheckboxDefaults.colors(checkedColor = GoldPrimary, uncheckedColor = SilverDim)
+                        checked         = isFullTank,
+                        onCheckedChange = { isFullTank = it },
+                        colors          = CheckboxDefaults.colors(
+                            checkedColor   = GoldPrimary,
+                            uncheckedColor = SilverDim
+                        )
                     )
                     Text("Full tank fill-up", color = ChromeWhite, fontSize = 14.sp)
                 }
@@ -776,7 +1043,9 @@ fun AddEditFuelScreen(
                             val lastEntry = entries.firstOrNull()
                             val mpg = if (lastEntry != null && isFullTank && lastEntry.isFullTank) {
                                 val milesDriven = (mileage.toIntOrNull() ?: 0) - lastEntry.mileageAtFill
-                                if (milesDriven > 0 && litresVal > 0) (milesDriven / (litresVal * 0.2199692)) else 0.0
+                                if (milesDriven > 0 && litresVal > 0)
+                                    milesDriven / (litresVal * 0.2199692)
+                                else 0.0
                             } else 0.0
                             val entry = FuelEntry(
                                 id            = entryId ?: 0L,
@@ -791,10 +1060,12 @@ fun AddEditFuelScreen(
                                 notes         = notes,
                                 mpg           = mpg
                             )
-                            if (entryId != null) vm.updateFuelEntry(entry) else vm.insertFuelEntry(entry)
+                            if (entryId != null) vm.updateFuelEntry(entry)
+                            else vm.insertFuelEntry(entry)
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    if (entryId != null) "Fuel entry updated" else "Fuel log saved successfully"
+                                    if (entryId != null) "Fuel entry updated"
+                                    else "Fuel log saved successfully"
                                 )
                             }
                             navController.popBackStack()
