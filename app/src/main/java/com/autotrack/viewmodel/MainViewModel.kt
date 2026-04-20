@@ -1,5 +1,6 @@
 package com.autotrack.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.autotrack.data.local.entity.FuelEntry
@@ -9,7 +10,9 @@ import com.autotrack.data.local.repository.AutoTrackRepository
 import com.autotrack.data.local.repository.NhtsaMake
 import com.autotrack.data.local.repository.NhtsaModel
 import com.autotrack.data.local.repository.PreferencesRepository
+import com.autotrack.notifications.scheduleServiceReminder
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -30,8 +33,7 @@ data class ServicePrediction(
 class MainViewModel @Inject constructor(
     private val repo: AutoTrackRepository,
     val prefsRepo: PreferencesRepository,
-    @dagger.hilt.android.qualifiers.ApplicationContext
-    private val appContext: android.content.Context
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     val vehicles: StateFlow<List<Vehicle>> = repo.getAllVehicles()
@@ -143,10 +145,16 @@ class MainViewModel @Inject constructor(
                     predictedDate = lastRecord.date + (intervalDays * dayMs)
                     predictedMileage = lastRecord.mileage + intervalMiles
                 } else {
-                    val cal = Calendar.getInstance()
-                    cal.set(vehicle.year, 0, 1)
-                    predictedDate = cal.timeInMillis + (intervalDays * dayMs)
-                    predictedMileage = vehicle.mileage + intervalMiles
+                    // FALLBACK: When no history exists, predict from NOW or next major milestone.
+                    // This prevents "unrealistic" ancient dates (e.g., from 2011) for older cars.
+                    predictedDate = now + (intervalDays * dayMs)
+                    
+                    predictedMileage = if (intervalMiles > 0) {
+                        // Round up to the next major interval milestone based on current mileage
+                        ((vehicle.mileage / intervalMiles) + 1) * intervalMiles
+                    } else {
+                        vehicle.mileage
+                    }
                 }
 
                 val daysUntil = ((predictedDate - now) / dayMs).toInt()
@@ -206,7 +214,7 @@ class MainViewModel @Inject constructor(
                 "Monthly" -> 30L
                 else -> 7L
             }
-            com.autotrack.notifications.scheduleServiceReminder(appContext, days)
+            scheduleServiceReminder(appContext, days)
         }
 
     fun setMileageAlerts(enabled: Boolean) =
