@@ -21,8 +21,12 @@ import com.autotrack.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 
 @AndroidEntryPoint
+@OptIn(ExperimentalPermissionsApi::class)
 class MainActivity : ComponentActivity() {
 
     private lateinit var sensorManager: SensorManager
@@ -57,9 +61,18 @@ class MainActivity : ComponentActivity() {
             val vm: MainViewModel = hiltViewModel()
             val prefs by vm.preferences.collectAsStateWithLifecycle()
             val navController = rememberNavController()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val notifPermission = com.google.accompanist.permissions.rememberPermissionState(
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                )
+                LaunchedEffect(notifPermission.status.isGranted) {
+                    if (!notifPermission.status.isGranted) {
+                        notifPermission.launchPermissionRequest()
+                    }
+                }
+            }
 
-            LaunchedEffect(prefs.shakeEnabled) {
-                if (prefs.shakeEnabled) {
+            LaunchedEffect(prefs.shakeEnabled) {                if (prefs.shakeEnabled) {
                     shakeCallback = {
                         val firstVehicle = vm.vehicles.value.firstOrNull()
                         if (firstVehicle != null) {
